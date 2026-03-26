@@ -1,0 +1,470 @@
+================================================================================
+                    FINFLOW LOAN MANAGEMENT SYSTEM
+                      COMPLETE PROJECT DOCUMENTATION
+================================================================================
+
+--------------------------------------------------------------------------------
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+
+FinFlow is a microservices-based Loan Management System built using Spring Boot,
+Spring Cloud, Docker, RabbitMQ, PostgreSQL, and JWT Authentication.
+
+It allows users to apply for loans, upload documents, and track their application
+status. Admins can review applications, verify documents, make decisions, and
+view reports.
+
+--------------------------------------------------------------------------------
+2. TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+
+Backend         : Java 17, Spring Boot 3.5.12
+Microservices   : Spring Cloud (Eureka, Config Server, Gateway)
+Security        : Spring Security, JWT (JJWT)
+Database        : PostgreSQL 15
+Messaging       : RabbitMQ 3 (with Outbox Pattern)
+Tracing         : Zipkin
+API Docs        : Swagger (SpringDoc OpenAPI)
+Logging         : SLF4J + Logback
+Testing         : JUnit 5 + Mockito
+Containerization: Docker + Docker Compose
+CI/CD           : GitHub Actions
+Registry        : Docker Hub
+
+--------------------------------------------------------------------------------
+3. MICROSERVICES ARCHITECTURE
+--------------------------------------------------------------------------------
+
+Client Request
+      |
+      v
+API Gateway (port 8080)
+      |
+      |-- JWT Validation (JwtAuthFilter)
+      |-- Route to appropriate service
+      |
+      |-----> auth-service        (port 8081)
+      |-----> application-service (port 8082)
+      |-----> document-service    (port 8083)
+      |-----> admin-service       (port 8084)
+      |
+      v
+Eureka Server (port 8761) -- Service Discovery
+Config Server (port 8888) -- Centralized Configuration
+
+Infrastructure:
+  - PostgreSQL  (port 5432) -- Database
+  - RabbitMQ    (port 5672, UI: 15672) -- Messaging
+  - Zipkin      (port 9411) -- Distributed Tracing
+
+--------------------------------------------------------------------------------
+4. SERVICE DESCRIPTIONS
+--------------------------------------------------------------------------------
+
+4.1 EUREKA SERVER (port 8761)
+------------------------------
+- Service registry for all microservices
+- All services register themselves on startup
+- API Gateway uses Eureka for load-balanced routing (lb://)
+- URL: http://localhost:8761
+
+4.2 CONFIG SERVER (port 8888)
+------------------------------
+- Centralized configuration for all services
+- Uses native filesystem backend (classpath:/configs/)
+- Each service fetches its config on startup
+- URL: http://localhost:8888/{service-name}/default
+- Config files location: config-server/src/main/resources/configs/
+
+4.3 AUTH SERVICE (port 8081)
+------------------------------
+- User registration and login
+- JWT token generation and validation
+- Admin user management
+- Database: finflow_auth
+
+Endpoints:
+  POST /auth/register              -- Register new user (ROLE_USER)
+  POST /auth/register/admin        -- Register admin (requires X-Admin-Secret header)
+  POST /auth/login                 -- Login and get JWT token
+  GET  /auth/validate              -- Validate JWT token
+  GET  /auth/admin/users           -- Get all users (ROLE_ADMIN)
+  PUT  /auth/admin/users/{id}      -- Update user role (ROLE_ADMIN)
+
+Admin Secret Key: finflow-admin-secret
+
+4.4 APPLICATION SERVICE (port 8082)
+-------------------------------------
+- Loan application lifecycle management
+- Outbox pattern for reliable event publishing to RabbitMQ
+- Database: finflow_application
+
+Endpoints:
+  POST /applications               -- Create draft application
+  PUT  /applications/{id}          -- Update draft application
+  POST /applications/{id}/submit   -- Submit application
+  GET  /applications/my            -- Get my applications
+  GET  /applications/{id}/status   -- Track application status
+  GET  /applications/admin/all     -- Get all applications (ROLE_ADMIN)
+  GET  /applications/admin/{id}    -- Get application by ID (ROLE_ADMIN)
+  PUT  /applications/admin/{id}/status -- Update application status (internal)
+
+Application Status Flow:
+  DRAFT -> SUBMITTED -> DOCS_PENDING -> DOCS_VERIFIED -> UNDER_REVIEW
+        -> APPROVED / REJECTED / CLOSED
+
+4.5 DOCUMENT SERVICE (port 8083)
+----------------------------------
+- Document upload and management
+- File storage on server filesystem
+- Admin document verification
+- Database: finflow_document
+
+Endpoints:
+  POST /documents/upload           -- Upload document (multipart/form-data)
+  GET  /documents/my               -- Get my documents
+  GET  /documents/application/{id} -- Get documents by application
+  PUT  /documents/admin/{id}/verify -- Verify/reject document (ROLE_ADMIN)
+  GET  /documents/admin/all        -- Get all documents (ROLE_ADMIN)
+
+Document Types: AADHAAR, PAN, SALARY_SLIP, BANK_STATEMENT, etc.
+Document Status: PENDING -> VERIFIED / REJECTED
+
+4.6 ADMIN SERVICE (port 8084)
+------------------------------
+- Admin operations for applications and users
+- Decision making (APPROVE/REJECT)
+- Reports generation
+- Consumes RabbitMQ events from application-service
+- Database: finflow_admin
+
+Endpoints:
+  GET  /admin/applications         -- Get all applications (ROLE_ADMIN)
+  GET  /admin/applications/{id}    -- Get application by ID (ROLE_ADMIN)
+  POST /admin/applications/{id}/decision -- Make decision (ROLE_ADMIN)
+  GET  /admin/applications/{id}/decision -- Get decision (ROLE_ADMIN)
+  GET  /admin/reports              -- Get reports/statistics (ROLE_ADMIN)
+  GET  /admin/users                -- Get all users (ROLE_ADMIN)
+  PUT  /admin/users/{id}           -- Update user (ROLE_ADMIN)
+  GET  /products                   -- Get loan products (public)
+
+4.7 API GATEWAY (port 8080)
+-----------------------------
+- Single entry point for all client requests
+- JWT validation via JwtAuthFilter
+- Routes requests to appropriate microservices
+- Load balancing via Eureka (lb://)
+- Swagger UI aggregation
+
+Public Routes (no JWT required):
+  /gateway/auth/register
+  /gateway/auth/register/admin
+  /gateway/auth/login
+  /gateway/auth/validate
+  /gateway/products
+
+Protected Routes (JWT required):
+  /gateway/auth/admin/**
+  /gateway/applications/**
+  /gateway/documents/**
+  /gateway/admin/**
+
+--------------------------------------------------------------------------------
+5. SECURITY FLOW
+--------------------------------------------------------------------------------
+
+1. User registers via POST /gateway/auth/register
+2. User logs in via POST /gateway/auth/login
+3. Server returns JWT token in Authorization response header
+4. Client sends JWT in Authorization: Bearer <token> header
+5. API Gateway validates JWT via JwtAuthFilter
+6. Gateway extracts email and role from token
+7. Gateway injects X-User-Email and X-User-Role headers into downstream request
+8. Services use these headers for authorization
+
+JWT Token contains:
+  - sub (email)
+  - role (ROLE_USER or ROLE_ADMIN)
+  - iat (issued at)
+  - exp (expiration - 24 hours)
+
+JWT Secret: mysupersecretkeymysupersecretkey12345678
+
+--------------------------------------------------------------------------------
+6. MESSAGING FLOW (OUTBOX PATTERN)
+--------------------------------------------------------------------------------
+
+When a loan application is submitted:
+
+1. Application status set to SUBMITTED
+2. OutboxEvent saved to outbox_events table (same DB transaction)
+   Payload: {"applicationId":1,"applicantEmail":"user@test.com","event":"APPLICATION_SUBMITTED"}
+3. OutboxEventPublisher runs every 5 seconds (@Scheduled)
+4. Picks up unpublished events (published=false)
+5. Publishes to RabbitMQ exchange: finflow.exchange
+6. Routing key: application.submitted
+7. Queue: application.submitted.queue
+8. Marks event as published=true
+9. admin-service consumes event via @RabbitListener
+10. Admin is notified of new application for review
+
+This pattern ensures no events are lost even if RabbitMQ is temporarily down.
+
+--------------------------------------------------------------------------------
+7. DATABASE STRUCTURE
+--------------------------------------------------------------------------------
+
+finflow_auth:
+  users (id, name, email, password, role)
+
+finflow_application:
+  loan_applications (id, applicantEmail, fullName, phone, address, dateOfBirth,
+                     employmentType, employerName, monthlyIncome, loanAmount,
+                     tenureMonths, loanPurpose, status, createdAt, updatedAt)
+  outbox_events (id, eventType, payload, published, createdAt, publishedAt)
+
+finflow_document:
+  documents (id, applicationId, applicantEmail, documentType, fileName,
+             filePath, status, remarks, uploadedAt, verifiedAt)
+
+finflow_admin:
+  decisions (id, applicationId, adminEmail, decision, remarks, approvedAmount,
+             interestRate, tenureMonths, decidedAt)
+
+--------------------------------------------------------------------------------
+8. COMPLETE WORKFLOW (END TO END)
+--------------------------------------------------------------------------------
+
+STEP 1: Register User
+  POST /gateway/auth/register
+  Body: { "name": "Yash Sindhu", "email": "user@test.com", "password": "Password@123" }
+
+STEP 2: Register Admin
+  POST /gateway/auth/register/admin
+  Header: X-Admin-Secret: finflow-admin-secret
+  Body: { "name": "Admin User", "email": "admin@test.com", "password": "Admin@123" }
+
+STEP 3: User Login
+  POST /gateway/auth/login
+  Body: { "email": "user@test.com", "password": "Password@123" }
+  Response Header: Authorization: Bearer <token>
+  -> Copy token and Authorize in Swagger
+
+STEP 4: Create Loan Application
+  POST /gateway/applications
+  Body: {
+    "fullName": "Yash Sindhu",
+    "phone": "9876543210",
+    "address": "123 MG Road Pune",
+    "dateOfBirth": "1998-05-15",
+    "employmentType": "SALARIED",
+    "employerName": "Infosys Ltd",
+    "monthlyIncome": 75000,
+    "loanAmount": 500000,
+    "tenureMonths": 36,
+    "loanPurpose": "HOME"
+  }
+  Response: { "id": 1, "status": "DRAFT", ... }
+
+STEP 5: Submit Application
+  POST /gateway/applications/1/submit
+  Response: { "id": 1, "status": "SUBMITTED", ... }
+  -> RabbitMQ event published to admin-service
+
+STEP 6: Upload Document
+  POST /gateway/documents/upload
+  Params: applicationId=1, documentType=AADHAAR, file=<your file>
+  Response: { "id": 1, "status": "PENDING", ... }
+
+STEP 7: Admin Login
+  POST /gateway/auth/login
+  Body: { "email": "admin@test.com", "password": "Admin@123" }
+  -> Copy admin token and Authorize in Swagger
+
+STEP 8: Admin Verifies Document
+  PUT /gateway/documents/admin/1/verify
+  Header: X-User-Role: ROLE_ADMIN
+  Body: { "status": "VERIFIED", "remarks": "Document looks good" }
+
+STEP 9: Admin Makes Decision
+  POST /gateway/admin/applications/1/decision
+  Header: X-User-Role: ROLE_ADMIN
+  Body: {
+    "decisionType": "APPROVED",
+    "remarks": "All documents verified, loan approved",
+    "approvedAmount": 500000,
+    "interestRate": 10.5,
+    "tenureMonths": 36
+  }
+
+STEP 10: Check Reports
+  GET /gateway/admin/reports
+  Header: X-User-Role: ROLE_ADMIN
+  Response: { "totalApplications": 1, "approved": 1, "approvalRate": "100.0%" }
+
+--------------------------------------------------------------------------------
+9. DOCKER SETUP
+--------------------------------------------------------------------------------
+
+All services run in Docker containers on a shared network: finflow-network
+
+Container List:
+  postgres              -- PostgreSQL database (port 5432)
+  rabbitmq              -- RabbitMQ broker (port 5672, UI: 15672)
+  zipkin                -- Distributed tracing (port 9411)
+  eureka-server         -- Service registry (port 8761)
+  config-server         -- Config server (port 8888)
+  auth-service          -- Auth microservice (port 8081)
+  application-service   -- Application microservice (port 8082)
+  document-service      -- Document microservice (port 8083)
+  admin-service         -- Admin microservice (port 8084)
+  api-gateway           -- API Gateway (port 8080)
+
+Volumes:
+  postgres_data         -- PostgreSQL data (persistent)
+  document_uploads      -- Uploaded documents (persistent)
+
+Docker Commands:
+  Start all:    docker-compose up -d
+  Stop all:     docker-compose down
+  View logs:    docker logs <service-name> -f
+  Check status: docker ps
+  Wipe data:    docker-compose down -v
+
+--------------------------------------------------------------------------------
+10. CI/CD PIPELINE (GITHUB ACTIONS)
+--------------------------------------------------------------------------------
+
+Workflow file: .github/workflows/ci-cd.yml
+Triggers on: push to master/main branch
+
+Pipeline Steps:
+  1. Checkout code
+  2. Set up JDK 17
+  3. Build & test each service (mvn clean package -DskipTests)
+  4. Upload jar artifacts
+  5. Login to Docker Hub
+  6. Build Docker image for each service
+  7. Push image to Docker Hub as yashsindhu/finflow-<service>:latest
+
+GitHub Secrets Required:
+  DOCKER_USERNAME: yashsindhu
+  DOCKER_PASSWORD: <docker hub access token>
+
+Docker Hub Images:
+  yashsindhu/finflow-eureka-server
+  yashsindhu/finflow-config-server
+  yashsindhu/finflow-auth-service
+  yashsindhu/finflow-application-service
+  yashsindhu/finflow-document-service
+  yashsindhu/finflow-admin-service
+  yashsindhu/finflow-api-gateway
+
+--------------------------------------------------------------------------------
+11. IMPORTANT URLs
+--------------------------------------------------------------------------------
+
+Swagger UI (All Services) : http://localhost:8080/swagger-ui.html
+Eureka Dashboard          : http://localhost:8761
+RabbitMQ Dashboard        : http://localhost:15672 (guest/guest)
+Zipkin Dashboard          : http://localhost:9411
+Config Server             : http://localhost:8888/{service}/default
+
+Individual Swagger UIs:
+  Auth Service            : http://localhost:8081/swagger-ui.html
+  Application Service     : http://localhost:8082/swagger-ui.html
+  Document Service        : http://localhost:8083/swagger-ui.html
+  Admin Service           : http://localhost:8084/swagger-ui.html
+
+GitHub Repository         : https://github.com/YashSindhu/finflow_Loan_Management
+Docker Hub                : https://hub.docker.com/u/yashsindhu
+
+--------------------------------------------------------------------------------
+12. TEST CREDENTIALS
+--------------------------------------------------------------------------------
+
+Regular User:
+  Email    : user@test.com
+  Password : Password@123
+  Role     : ROLE_USER
+
+Admin User:
+  Email    : admin@test.com
+  Password : Admin@123
+  Role     : ROLE_ADMIN
+
+Admin Registration Secret: finflow-admin-secret
+
+--------------------------------------------------------------------------------
+13. DAILY USAGE
+--------------------------------------------------------------------------------
+
+Starting the project:
+  1. Open Docker Desktop
+  2. Wait for Docker to start (whale icon steady)
+  3. Open Command Prompt
+  4. cd c:\Users\yashs\Desktop\finflow
+  5. docker-compose up -d
+  6. Wait ~1 minute for all services to start
+  7. Open http://localhost:8080/swagger-ui.html
+
+Stopping the project:
+  1. Open Command Prompt
+  2. cd c:\Users\yashs\Desktop\finflow
+  3. docker-compose down
+
+After code changes:
+  1. Make changes in Eclipse
+  2. mvn clean package -DskipTests -f <service>/pom.xml
+  3. docker cp <service>/target/<service>-0.0.1-SNAPSHOT.jar <service>:/app/app.jar
+  4. docker restart <service>
+  5. git add . && git commit -m "message" && git push
+
+--------------------------------------------------------------------------------
+14. JUNIT & MOCKITO TESTS
+--------------------------------------------------------------------------------
+
+Test files location:
+  application-service : src/test/java/.../service/LoanApplicationServiceTest.java
+                        src/test/java/.../config/OutboxEventPublisherTest.java
+  auth-service        : src/test/java/.../service/AuthServiceTest.java
+                        src/test/java/.../jwt/JwtUtilTest.java
+  admin-service       : src/test/java/.../service/AdminServiceTest.java
+  document-service    : src/test/java/.../service/DocumentServiceTest.java
+
+Run all tests:
+  mvn test
+
+Run tests for specific service:
+  mvn test -pl application-service
+  mvn test -pl auth-service
+  mvn test -pl admin-service
+  mvn test -pl document-service
+
+--------------------------------------------------------------------------------
+15. PROJECT STRUCTURE
+--------------------------------------------------------------------------------
+
+finflow/
+  |-- eureka-server/          Service registry
+  |-- config-server/          Centralized config
+  |   |-- src/main/resources/configs/
+  |       |-- auth-service.properties
+  |       |-- application-service.properties
+  |       |-- admin-service.properties
+  |       |-- document-service.properties
+  |       |-- api-gateway.properties
+  |-- auth-service/           Authentication & authorization
+  |-- application-service/    Loan application management
+  |-- document-service/       Document upload & verification
+  |-- admin-service/          Admin operations & reports
+  |-- api-gateway/            API Gateway & routing
+  |-- docker-compose.yml      Docker orchestration
+  |-- init-db.sql             Database initialization
+  |-- .github/workflows/      CI/CD pipeline
+  |   |-- ci-cd.yml
+  |-- .gitignore
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
