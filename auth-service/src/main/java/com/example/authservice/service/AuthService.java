@@ -51,6 +51,26 @@ public class AuthService {
         return "User registered successfully";
     }
 
+    public String registerAdmin(RegisterRequest request, String adminSecret) {
+        log.info("Admin registration attempt for email: {}", request.getEmail());
+        if (!"finflow-admin-secret".equals(adminSecret)) {
+            log.warn("Admin registration failed - invalid secret for email: {}", request.getEmail());
+            throw new RuntimeException("Invalid admin secret");
+        }
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            log.warn("Admin registration failed - email already exists: {}", request.getEmail());
+            throw new RuntimeException("Email already registered");
+        }
+        User user = new User();
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole("ROLE_ADMIN");
+        userRepository.save(user);
+        log.info("Admin registered successfully: {}", request.getEmail());
+        return "Admin registered successfully";
+    }
+
     public AuthResponse login(AuthRequest request) {
         log.info("Login attempt for email: {}", request.getEmail());
         authenticationManager.authenticate(

@@ -36,6 +36,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.register(request));
     }
 
+    @PostMapping("/register/admin")
+    public ResponseEntity<String> registerAdmin(
+            @Valid @RequestBody RegisterRequest request,
+            @RequestHeader(value = "X-Admin-Secret", required = true) String adminSecret) {
+        log.info("POST /auth/register/admin - email: {}", request.getEmail());
+        return ResponseEntity.ok(authService.registerAdmin(request, adminSecret));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody AuthRequest request) {
         log.info("POST /auth/login - email: {}", request.getEmail());
