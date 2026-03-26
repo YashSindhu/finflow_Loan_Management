@@ -1,5 +1,7 @@
 package com.example.adminservice.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,8 +14,11 @@ import java.util.Map;
 @RequestMapping("/products")
 public class ProductController {
 
+    private static final Logger log = LoggerFactory.getLogger(ProductController.class);
+
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getProducts() {
+        log.info("GET /products - fetching all loan products");
         List<Map<String, Object>> products = List.of(
             Map.of(
                 "id", 1,
