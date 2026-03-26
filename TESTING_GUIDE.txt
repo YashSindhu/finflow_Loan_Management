@@ -1,0 +1,527 @@
+================================================================================
+              FINFLOW - ENDPOINT TESTING & DOCKER COMMANDS GUIDE
+================================================================================
+
+All API calls go through: http://localhost:8080/swagger-ui.html
+Open Swagger UI and follow the steps below one by one.
+
+================================================================================
+SECTION 1: DOCKER COMMANDS
+================================================================================
+
+--- DAILY START ---
+cd c:\Users\yashs\Desktop\finflow
+docker-compose up -d
+
+--- DAILY STOP ---
+cd c:\Users\yashs\Desktop\finflow
+docker-compose down
+
+--- CHECK ALL CONTAINERS RUNNING ---
+docker ps
+
+--- VIEW LOGS OF A SERVICE ---
+docker logs auth-service -f
+docker logs application-service -f
+docker logs admin-service -f
+docker logs document-service -f
+docker logs api-gateway -f
+docker logs config-server -f
+docker logs eureka-server -f
+
+--- RESTART A SINGLE SERVICE ---
+docker restart auth-service
+docker restart application-service
+docker restart admin-service
+docker restart document-service
+docker restart api-gateway
+
+--- AFTER CODE CHANGES ---
+mvn clean package -DskipTests -f auth-service/pom.xml
+docker cp auth-service/target/auth-service-0.0.1-SNAPSHOT.jar auth-service:/app/app.jar
+docker restart auth-service
+
+mvn clean package -DskipTests -f application-service/pom.xml
+docker cp application-service/target/application-service-0.0.1-SNAPSHOT.jar application-service:/app/app.jar
+docker restart application-service
+
+mvn clean package -DskipTests -f admin-service/pom.xml
+docker cp admin-service/target/admin-service-0.0.1-SNAPSHOT.jar admin-service:/app/app.jar
+docker restart admin-service
+
+mvn clean package -DskipTests -f document-service/pom.xml
+docker cp document-service/target/document-service-0.0.1-SNAPSHOT.jar document-service:/app/app.jar
+docker restart document-service
+
+mvn clean package -DskipTests -f api-gateway/pom.xml
+docker cp api-gateway/target/api-gateway-0.0.1-SNAPSHOT.jar api-gateway:/app/app.jar
+docker restart api-gateway
+
+--- WIPE ALL DATA AND START FRESH ---
+docker-compose down -v
+docker-compose up -d
+
+--- PUSH CODE TO GITHUB (triggers CI/CD) ---
+git add .
+git commit -m "your message here"
+git push
+
+================================================================================
+SECTION 2: IMPORTANT URLS
+================================================================================
+
+Swagger UI (Main)   : http://localhost:8080/swagger-ui.html
+Eureka Dashboard    : http://localhost:8761
+RabbitMQ Dashboard  : http://localhost:15672   (username: guest, password: guest)
+Zipkin Dashboard    : http://localhost:9411
+Config Server       : http://localhost:8888/auth-service/default
+                      http://localhost:8888/application-service/default
+                      http://localhost:8888/admin-service/default
+                      http://localhost:8888/document-service/default
+                      http://localhost:8888/api-gateway/default
+
+================================================================================
+SECTION 3: TEST CREDENTIALS
+================================================================================
+
+Regular User:
+  Email    : user@test.com
+  Password : Password@123
+
+Admin User:
+  Email    : admin@test.com
+  Password : Admin@123
+
+Admin Registration Secret Header:
+  X-Admin-Secret : finflow-admin-secret
+
+================================================================================
+SECTION 4: COMPLETE ENDPOINT TESTING (STEP BY STEP)
+================================================================================
+
+Open http://localhost:8080/swagger-ui.html
+Select the service from the top-right dropdown before testing each endpoint.
+
+--------------------------------------------------------------------------------
+STEP 1: REGISTER A USER
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : POST
+Endpoint : /auth/register
+Body:
+{
+  "name": "Yash Sindhu",
+  "email": "user@test.com",
+  "password": "Password@123"
+}
+Expected Response: 200 - "User registered successfully"
+
+--------------------------------------------------------------------------------
+STEP 2: REGISTER AN ADMIN
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : POST
+Endpoint : /auth/register/admin
+Header   : X-Admin-Secret = finflow-admin-secret
+Body:
+{
+  "name": "Admin User",
+  "email": "admin@test.com",
+  "password": "Admin@123"
+}
+Expected Response: 200 - "Admin registered successfully"
+
+--------------------------------------------------------------------------------
+STEP 3: USER LOGIN
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : POST
+Endpoint : /auth/login
+Body:
+{
+  "email": "user@test.com",
+  "password": "Password@123"
+}
+Expected Response: 200
+-> Copy the token from Response Headers: authorization: Bearer eyJ...
+-> Click AUTHORIZE button (lock icon) in Swagger
+-> Paste the token (without "Bearer " prefix)
+-> Click Authorize and Close
+
+--------------------------------------------------------------------------------
+STEP 4: VALIDATE TOKEN
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : GET
+Endpoint : /auth/validate
+Header   : Authorization = Bearer <your token>
+Expected Response: 200 - "user@test.com"
+
+--------------------------------------------------------------------------------
+STEP 5: CREATE LOAN APPLICATION (logged in as user)
+--------------------------------------------------------------------------------
+Service  : Application Service
+Method   : POST
+Endpoint : /applications
+Leave X-User-Email empty (auto-injected from JWT token)
+Body:
+{
+  "fullName": "Yash Sindhu",
+  "phone": "9876543210",
+  "address": "123 MG Road Pune",
+  "dateOfBirth": "1998-05-15",
+  "employmentType": "SALARIED",
+  "employerName": "Infosys Ltd",
+  "monthlyIncome": 75000,
+  "loanAmount": 500000,
+  "tenureMonths": 36,
+  "loanPurpose": "HOME"
+}
+Expected Response: 200 - { "id": 1, "status": "DRAFT", ... }
+-> Note the application ID (e.g. 1)
+
+--------------------------------------------------------------------------------
+STEP 6: UPDATE APPLICATION (optional, only if status is DRAFT)
+--------------------------------------------------------------------------------
+Service  : Application Service
+Method   : PUT
+Endpoint : /applications/1
+Leave X-User-Email empty
+Body: (change any field)
+{
+  "loanAmount": 600000,
+  "tenureMonths": 48
+}
+Expected Response: 200 - updated application
+
+--------------------------------------------------------------------------------
+STEP 7: SUBMIT APPLICATION
+--------------------------------------------------------------------------------
+Service  : Application Service
+Method   : POST
+Endpoint : /applications/1/submit
+Leave X-User-Email empty
+Expected Response: 200 - { "id": 1, "status": "SUBMITTED", ... }
+-> RabbitMQ event is published to admin-service automatically
+
+--------------------------------------------------------------------------------
+STEP 8: CHECK MY APPLICATIONS
+--------------------------------------------------------------------------------
+Service  : Application Service
+Method   : GET
+Endpoint : /applications/my
+Leave X-User-Email empty
+Expected Response: 200 - list of your applications
+
+--------------------------------------------------------------------------------
+STEP 9: TRACK APPLICATION STATUS
+--------------------------------------------------------------------------------
+Service  : Application Service
+Method   : GET
+Endpoint : /applications/1/status
+Leave X-User-Email empty
+Expected Response: 200 - { "id": 1, "status": "SUBMITTED", ... }
+
+--------------------------------------------------------------------------------
+STEP 10: UPLOAD DOCUMENT
+--------------------------------------------------------------------------------
+Service  : Document Service
+Method   : POST
+Endpoint : /documents/upload
+Leave X-User-Email empty
+Params:
+  applicationId = 1
+  documentType  = AADHAAR
+  file          = (select any file from your computer)
+Expected Response: 200 - { "id": 1, "status": "PENDING", ... }
+-> Note the document ID (e.g. 1)
+
+--------------------------------------------------------------------------------
+STEP 11: CHECK MY DOCUMENTS
+--------------------------------------------------------------------------------
+Service  : Document Service
+Method   : GET
+Endpoint : /documents/my
+Leave X-User-Email empty
+Expected Response: 200 - list of your documents
+
+--------------------------------------------------------------------------------
+STEP 12: GET DOCUMENTS BY APPLICATION
+--------------------------------------------------------------------------------
+Service  : Document Service
+Method   : GET
+Endpoint : /documents/application/1
+Expected Response: 200 - list of documents for application 1
+
+--------------------------------------------------------------------------------
+STEP 13: ADMIN LOGIN
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : POST
+Endpoint : /auth/login
+Body:
+{
+  "email": "admin@test.com",
+  "password": "Admin@123"
+}
+Expected Response: 200
+-> Copy admin token from Response Headers
+-> Click AUTHORIZE in Swagger
+-> Replace old token with admin token
+-> Click Authorize and Close
+
+--------------------------------------------------------------------------------
+STEP 14: GET ALL USERS (admin only)
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : GET
+Endpoint : /auth/admin/users
+Header   : X-User-Role = ROLE_ADMIN
+Expected Response: 200 - list of all users
+
+--------------------------------------------------------------------------------
+STEP 15: GET ALL APPLICATIONS (admin only)
+--------------------------------------------------------------------------------
+Service  : Admin Service
+Method   : GET
+Endpoint : /admin/applications
+Header   : X-User-Role = ROLE_ADMIN
+Expected Response: 200 - list of all applications
+
+--------------------------------------------------------------------------------
+STEP 16: VERIFY DOCUMENT (admin only)
+--------------------------------------------------------------------------------
+Service  : Document Service
+Method   : PUT
+Endpoint : /documents/admin/1/verify
+Header   : X-User-Role = ROLE_ADMIN
+Body:
+{
+  "status": "VERIFIED",
+  "remarks": "Document looks good"
+}
+Expected Response: 200 - { "id": 1, "status": "VERIFIED", ... }
+
+To REJECT a document:
+{
+  "status": "REJECTED",
+  "remarks": "Document is blurry, please re-upload"
+}
+
+--------------------------------------------------------------------------------
+STEP 17: GET ALL DOCUMENTS (admin only)
+--------------------------------------------------------------------------------
+Service  : Document Service
+Method   : GET
+Endpoint : /documents/admin/all
+Header   : X-User-Role = ROLE_ADMIN
+Expected Response: 200 - list of all documents
+
+--------------------------------------------------------------------------------
+STEP 18: MAKE DECISION ON APPLICATION (admin only)
+--------------------------------------------------------------------------------
+Service  : Admin Service
+Method   : POST
+Endpoint : /admin/applications/1/decision
+Header   : X-User-Role = ROLE_ADMIN
+          X-User-Email = (leave empty, auto-injected from JWT)
+
+To APPROVE:
+{
+  "decisionType": "APPROVED",
+  "remarks": "All documents verified, loan approved",
+  "approvedAmount": 500000,
+  "interestRate": 10.5,
+  "tenureMonths": 36
+}
+
+To REJECT:
+{
+  "decisionType": "REJECTED",
+  "remarks": "Insufficient income",
+  "approvedAmount": 0,
+  "interestRate": 0,
+  "tenureMonths": 0
+}
+
+Expected Response: 200 - { "id": 1, "decision": "APPROVED", ... }
+
+--------------------------------------------------------------------------------
+STEP 19: GET DECISION FOR APPLICATION (admin only)
+--------------------------------------------------------------------------------
+Service  : Admin Service
+Method   : GET
+Endpoint : /admin/applications/1/decision
+Header   : X-User-Role = ROLE_ADMIN
+Expected Response: 200 - decision details
+
+--------------------------------------------------------------------------------
+STEP 20: VIEW REPORTS (admin only)
+--------------------------------------------------------------------------------
+Service  : Admin Service
+Method   : GET
+Endpoint : /admin/reports
+Header   : X-User-Role = ROLE_ADMIN
+Expected Response:
+{
+  "totalApplications": 1,
+  "approved": 1,
+  "rejected": 0,
+  "pending": 0,
+  "approvalRate": "100.0%"
+}
+
+--------------------------------------------------------------------------------
+STEP 21: GET LOAN PRODUCTS (public)
+--------------------------------------------------------------------------------
+Service  : Admin Service
+Method   : GET
+Endpoint : /products
+No auth required
+Expected Response: 200 - list of loan products (Personal, Home, Business)
+
+--------------------------------------------------------------------------------
+STEP 22: UPDATE USER ROLE (admin only)
+--------------------------------------------------------------------------------
+Service  : Auth Service
+Method   : PUT
+Endpoint : /auth/admin/users/1
+Header   : X-User-Role = ROLE_ADMIN
+Body:
+{
+  "role": "ROLE_ADMIN"
+}
+Expected Response: 200 - updated user
+
+================================================================================
+SECTION 5: VALIDATION RULES
+================================================================================
+
+Password Rules:
+  - Minimum 8 characters
+  - At least 1 uppercase letter
+  - At least 1 lowercase letter
+  - At least 1 digit
+  - At least 1 special character (@$!%*?&)
+  - Example: Password@123
+
+Phone Rules:
+  - Must be a valid 10-digit Indian mobile number
+  - Must start with 6, 7, 8, or 9
+  - Example: 9876543210
+
+Employment Types (exact values):
+  SALARIED | SELF_EMPLOYED | BUSINESS | UNEMPLOYED
+
+Loan Purpose (exact values):
+  HOME | PERSONAL | BUSINESS | EDUCATION | VEHICLE | OTHER
+
+Loan Amount:
+  Minimum: 10,000
+  Maximum: 5,00,00,000
+
+Tenure:
+  Minimum: 6 months
+  Maximum: 360 months
+
+Monthly Income:
+  Minimum: 1000
+
+Date of Birth Format:
+  YYYY-MM-DD (example: 1998-05-15)
+
+Decision Types (exact values):
+  APPROVED | REJECTED
+
+Document Status (exact values):
+  VERIFIED | REJECTED
+
+================================================================================
+SECTION 6: RUNNING TESTS
+================================================================================
+
+--- RUN ALL TESTS ---
+cd c:\Users\yashs\Desktop\finflow
+mvn test
+
+--- RUN TESTS FOR SPECIFIC SERVICE ---
+mvn test -pl auth-service
+mvn test -pl application-service
+mvn test -pl admin-service
+mvn test -pl document-service
+
+--- RUN IN ECLIPSE ---
+1. Open test file (e.g. LoanApplicationServiceTest.java)
+2. Right-click anywhere in the file
+3. Run As -> JUnit Test
+4. View results in JUnit panel at the bottom
+
+================================================================================
+SECTION 7: CHECKING SERVICES
+================================================================================
+
+--- CHECK EUREKA (all services registered) ---
+Open: http://localhost:8761
+You should see all services listed as UP:
+  APPLICATION-SERVICE
+  AUTH-SERVICE
+  ADMIN-SERVICE
+  DOCUMENT-SERVICE
+  API-GATEWAY
+  CONFIG-SERVER
+
+--- CHECK RABBITMQ (messages flowing) ---
+Open: http://localhost:15672
+Login: guest / guest
+Go to Queues tab
+You should see: application.submitted.queue
+
+--- CHECK ZIPKIN (traces) ---
+Open: http://localhost:9411
+Click Run Query
+You should see traces from your API calls
+
+--- CHECK CONFIG SERVER ---
+Open: http://localhost:8888/auth-service/default
+You should see all auth-service properties in JSON format
+
+================================================================================
+SECTION 8: COMMON ERRORS AND FIXES
+================================================================================
+
+ERROR: 401 Unauthorized
+FIX  : You are not logged in or token expired
+       -> Login again and re-authorize in Swagger
+
+ERROR: 403 Forbidden
+FIX  : You don't have the required role
+       -> Make sure you are logged in as admin for admin endpoints
+       -> Add X-User-Role: ROLE_ADMIN header
+
+ERROR: 404 Not Found
+FIX  : Wrong URL or service not running
+       -> Check docker ps to see if service is running
+       -> Check the endpoint URL is correct
+
+ERROR: 400 Bad Request
+FIX  : Validation failed
+       -> Check the request body matches validation rules above
+       -> Check password meets requirements
+
+ERROR: 503 Service Unavailable
+FIX  : Service not registered with Eureka yet
+       -> Wait 30 seconds and try again
+       -> Check http://localhost:8761 to see if service is registered
+
+ERROR: 500 Internal Server Error
+FIX  : Check service logs
+       -> docker logs <service-name> -f
+
+ERROR: Email already registered
+FIX  : Use a different email or wipe data
+       -> docker-compose down -v
+       -> docker-compose up -d
+
+================================================================================
+                              END OF GUIDE
+================================================================================
