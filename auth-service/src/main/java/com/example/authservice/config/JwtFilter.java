@@ -34,6 +34,13 @@ public class JwtFilter extends OncePerRequestFilter {
                                    FilterChain filterChain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        // Skip JWT check for admin endpoints — they are protected by X-User-Role header check inside the controller
+        if (path.startsWith("/auth/admin/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         String token = null;
