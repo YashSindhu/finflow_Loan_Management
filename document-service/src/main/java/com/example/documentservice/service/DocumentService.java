@@ -40,7 +40,11 @@ public class DocumentService {
             log.warn("Upload failed - invalid file name for email: {}", email);
             throw new RuntimeException("Invalid file name");
         }
-        String safeName = Paths.get(originalName).getFileName().toString();
+        Path fileNamePath = Paths.get(originalName).getFileName();
+        if (fileNamePath == null) {
+            throw new RuntimeException("Invalid file name");
+        }
+        String safeName = fileNamePath.toString();
         String uniqueName = UUID.randomUUID() + "_" + safeName;
         Path filePath = dir.resolve(uniqueName).normalize();
         if (!filePath.startsWith(dir)) {
@@ -53,7 +57,7 @@ public class DocumentService {
         doc.setApplicantEmail(email);
         doc.setApplicationId(applicationId);
         doc.setDocumentType(documentType);
-        doc.setFileName(file.getOriginalFilename());
+        doc.setFileName(originalName);
         doc.setFilePath(filePath.toString());
         Document saved = repository.save(doc);
         log.info("Document uploaded successfully - id: {}, type: {}, applicationId: {}", saved.getId(), documentType, applicationId);
