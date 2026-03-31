@@ -70,7 +70,7 @@ public class AdminService {
     }
 
     public Decision makeDecision(Long applicationId, String adminEmail, DecisionRequest req) {
-        log.info("Admin: {} making decision: {} for application id: {}", adminEmail, req.getDecision(), applicationId);
+        log.info("Admin: {} making decision: {} for application id: {}", adminEmail, req.getDecisionType(), applicationId);
         if (decisionRepository.findByApplicationId(applicationId).isPresent()) {
             log.warn("Decision already exists for application id: {}", applicationId);
             throw new IllegalStateException("Decision already made for application: " + applicationId);
@@ -79,14 +79,14 @@ public class AdminService {
         Decision decision = new Decision();
         decision.setApplicationId(applicationId);
         decision.setAdminEmail(adminEmail);
-        decision.setDecision(DecisionType.valueOf(req.getDecision()));
+        decision.setDecision(DecisionType.valueOf(req.getDecisionType()));
         decision.setRemarks(req.getRemarks());
         decision.setApprovedAmount(req.getApprovedAmount());
         decision.setInterestRate(req.getInterestRate());
         decision.setTenureMonths(req.getTenureMonths());
         Decision saved = decisionRepository.save(decision);
 
-        String newStatus = DecisionType.APPROVED.name().equals(req.getDecision()) ? "APPROVED" : "REJECTED";
+        String newStatus = DecisionType.APPROVED.name().equals(req.getDecisionType()) ? "APPROVED" : "REJECTED";
         log.info("Updating application id: {} status to: {}", applicationId, newStatus);
         updateApplicationStatus(applicationId, newStatus);
         log.info("Decision saved successfully for application id: {}", applicationId);

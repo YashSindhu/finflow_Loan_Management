@@ -24,7 +24,6 @@ public class DecisionRequest {
 
     public String getDecisionType() { return decisionType; }
     public void setDecisionType(String decisionType) { this.decisionType = decisionType; }
-    public String getDecision() { return decisionType; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
     public Double getApprovedAmount() { return approvedAmount; }
