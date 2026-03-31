@@ -15,18 +15,18 @@ public class RabbitMQConfig {
     public static final String ROUTING_KEY = "application.submitted";
 
     @Bean
-    public TopicExchange exchange() {
+    public TopicExchange finflowExchange() {
         return new TopicExchange(EXCHANGE);
     }
 
     @Bean
-    public Queue queue() {
+    public Queue submittedQueue() {
         return new Queue(QUEUE, true);
     }
 
     @Bean
-    public Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(ROUTING_KEY);
+    public Binding submittedBinding(Queue submittedQueue, TopicExchange finflowExchange) {
+        return BindingBuilder.bind(submittedQueue).to(finflowExchange).with(ROUTING_KEY);
     }
 
     @Bean

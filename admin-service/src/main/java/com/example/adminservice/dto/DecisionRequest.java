@@ -22,10 +22,9 @@ public class DecisionRequest {
     @Max(value = 360, message = "Tenure must not exceed 360 months")
     private Integer tenureMonths;
 
-    public String getDecision() { return decisionType; }
-    public void setDecision(String decision) { this.decisionType = decision; }
     public String getDecisionType() { return decisionType; }
     public void setDecisionType(String decisionType) { this.decisionType = decisionType; }
+    public String getDecision() { return decisionType; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
     public Double getApprovedAmount() { return approvedAmount; }

@@ -19,7 +19,7 @@ public class Decision {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private DecisionType decision;
+    private DecisionType decisionType;
 
     private String remarks;
     private Double approvedAmount;
@@ -38,8 +38,8 @@ public class Decision {
     public void setApplicationId(Long applicationId) { this.applicationId = applicationId; }
     public String getAdminEmail() { return adminEmail; }
     public void setAdminEmail(String adminEmail) { this.adminEmail = adminEmail; }
-    public DecisionType getDecision() { return decision; }
-    public void setDecision(DecisionType decision) { this.decision = decision; }
+    public DecisionType getDecision() { return decisionType; }
+    public void setDecision(DecisionType decisionType) { this.decisionType = decisionType; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
     public Double getApprovedAmount() { return approvedAmount; }

@@ -33,11 +33,11 @@ class AdminServiceTest {
     @Mock
     private RestTemplate restTemplate;
 
-    @InjectMocks
     private AdminService adminService;
 
     @BeforeEach
     void setUp() {
+        adminService = new AdminService(decisionRepository, restTemplate);
         ReflectionTestUtils.setField(adminService, "applicationServiceUrl", "http://application-service");
         ReflectionTestUtils.setField(adminService, "authServiceUrl", "http://auth-service");
     }
@@ -75,7 +75,7 @@ class AdminServiceTest {
     @Test
     void makeDecision_savesDecisionAndUpdatesApplicationStatus() {
         DecisionRequest req = new DecisionRequest();
-        req.setDecision("APPROVED");
+        req.setDecisionType("APPROVED");
         req.setRemarks("Looks good");
         req.setApprovedAmount(500000.0);
         req.setInterestRate(10.5);
@@ -100,7 +100,7 @@ class AdminServiceTest {
     @Test
     void makeDecision_throwsIfDecisionAlreadyExists() {
         DecisionRequest req = new DecisionRequest();
-        req.setDecision("APPROVED");
+        req.setDecisionType("APPROVED");
 
         when(decisionRepository.findByApplicationId(1L)).thenReturn(Optional.of(new Decision()));
 

@@ -16,6 +16,13 @@ public class ProductController {
 
     private static final Logger log = LoggerFactory.getLogger(ProductController.class);
 
+    private static final String DESCRIPTION = "description";
+    private static final String MIN_AMOUNT = "minAmount";
+    private static final String MAX_AMOUNT = "maxAmount";
+    private static final String MIN_TENURE = "minTenureMonths";
+    private static final String MAX_TENURE = "maxTenureMonths";
+    private static final String INTEREST_RATE = "interestRatePercent";
+
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getProducts() {
         log.info("GET /products - fetching all loan products");
@@ -23,32 +30,32 @@ public class ProductController {
             Map.of(
                 "id", 1,
                 "name", "Personal Loan",
-                "description", "Quick personal loans with minimal documentation",
-                "minAmount", 50000,
-                "maxAmount", 1500000,
-                "minTenureMonths", 12,
-                "maxTenureMonths", 60,
-                "interestRatePercent", 10.5
+                DESCRIPTION, "Quick personal loans with minimal documentation",
+                MIN_AMOUNT, 50000,
+                MAX_AMOUNT, 1500000,
+                MIN_TENURE, 12,
+                MAX_TENURE, 60,
+                INTEREST_RATE, 10.5
             ),
             Map.of(
                 "id", 2,
                 "name", "Home Loan",
-                "description", "Affordable home loans for your dream house",
-                "minAmount", 500000,
-                "maxAmount", 50000000,
-                "minTenureMonths", 60,
-                "maxTenureMonths", 300,
-                "interestRatePercent", 8.5
+                DESCRIPTION, "Affordable home loans for your dream house",
+                MIN_AMOUNT, 500000,
+                MAX_AMOUNT, 50000000,
+                MIN_TENURE, 60,
+                MAX_TENURE, 300,
+                INTEREST_RATE, 8.5
             ),
             Map.of(
                 "id", 3,
                 "name", "Business Loan",
-                "description", "Grow your business with flexible financing",
-                "minAmount", 100000,
-                "maxAmount", 10000000,
-                "minTenureMonths", 12,
-                "maxTenureMonths", 84,
-                "interestRatePercent", 12.0
+                DESCRIPTION, "Grow your business with flexible financing",
+                MIN_AMOUNT, 100000,
+                MAX_AMOUNT, 10000000,
+                MIN_TENURE, 12,
+                MAX_TENURE, 84,
+                INTEREST_RATE, 12.0
             )
         );
         return ResponseEntity.ok(products);

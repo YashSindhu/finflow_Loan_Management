@@ -7,7 +7,6 @@ import com.example.adminservice.entity.Decision.DecisionType;
 import com.example.adminservice.repository.DecisionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
@@ -23,11 +22,8 @@ public class AdminService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
-    @Autowired
-    private DecisionRepository decisionRepository;
-
-    @Autowired
-    private RestTemplate restTemplate;
+    private final DecisionRepository decisionRepository;
+    private final RestTemplate restTemplate;
 
     @Value("${application.service.url}")
     private String applicationServiceUrl;
@@ -35,7 +31,11 @@ public class AdminService {
     @Value("${auth.service.url}")
     private String authServiceUrl;
 
-    // Internal header used for service-to-service calls
+    public AdminService(DecisionRepository decisionRepository, RestTemplate restTemplate) {
+        this.decisionRepository = decisionRepository;
+        this.restTemplate = restTemplate;
+    }
+
     private HttpEntity<Void> adminHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-User-Role", "ROLE_ADMIN");
@@ -48,8 +48,6 @@ public class AdminService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
     }
-
-    // ── Applications ──────────────────────────────────────────────
 
     public List<Map<String, Object>> getAllApplications() {
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
@@ -71,13 +69,11 @@ public class AdminService {
         return response.getBody();
     }
 
-    // ── Decision ──────────────────────────────────────────────────
-
     public Decision makeDecision(Long applicationId, String adminEmail, DecisionRequest req) {
         log.info("Admin: {} making decision: {} for application id: {}", adminEmail, req.getDecision(), applicationId);
         if (decisionRepository.findByApplicationId(applicationId).isPresent()) {
             log.warn("Decision already exists for application id: {}", applicationId);
-            throw new RuntimeException("Decision already made for application: " + applicationId);
+            throw new IllegalStateException("Decision already made for application: " + applicationId);
         }
 
         Decision decision = new Decision();
@@ -105,10 +101,8 @@ public class AdminService {
 
     public Decision getDecisionByApplication(Long applicationId) {
         return decisionRepository.findByApplicationId(applicationId)
-                .orElseThrow(() -> new RuntimeException("No decision found for application: " + applicationId));
+                .orElseThrow(() -> new IllegalArgumentException("No decision found for application: " + applicationId));
     }
-
-    // ── Reports ───────────────────────────────────────────────────
 
     public Map<String, Object> getReports() {
         List<Map<String, Object>> allApps = getAllApplications();
@@ -126,8 +120,6 @@ public class AdminService {
         report.put("approvalRate", total > 0 ? (approved * 100.0 / total) + "%" : "0%");
         return report;
     }
-
-    // ── Users ─────────────────────────────────────────────────────
 
     public List<Map<String, Object>> getAllUsers() {
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
