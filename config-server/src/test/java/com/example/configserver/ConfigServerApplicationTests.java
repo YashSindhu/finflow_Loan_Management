@@ -1,10 +1,10 @@
-package com.example.eurekaserver;
+package com.example.configserver;
 
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class EurekaServerApplicationTests {
+class ConfigServerApplicationTests {
 
     @Test
     void contextLoads() {
