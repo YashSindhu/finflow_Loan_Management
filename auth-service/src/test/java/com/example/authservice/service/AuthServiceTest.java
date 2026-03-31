@@ -146,4 +146,44 @@ class AuthServiceTest {
 
         assertThrows(RuntimeException.class, () -> authService.updateUser(99L, "ROLE_ADMIN"));
     }
+
+    // --- registerAdmin ---
+
+    @Test
+    void registerAdmin_savesAdminWithCorrectSecret() {
+        RegisterRequest req = new RegisterRequest();
+        req.setName("Admin");
+        req.setEmail("admin@test.com");
+        req.setPassword("Admin@123");
+
+        when(userRepository.findByEmail("admin@test.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Admin@123")).thenReturn("encodedAdmin");
+
+        String result = authService.registerAdmin(req, "finflow-admin-secret");
+
+        assertEquals("Admin registered successfully", result);
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void registerAdmin_throwsForInvalidSecret() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("admin@test.com");
+
+        assertThrows(RuntimeException.class,
+                () -> authService.registerAdmin(req, "wrong-secret"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void registerAdmin_throwsIfEmailAlreadyExists() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("admin@test.com");
+
+        when(userRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(user));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.registerAdmin(req, "finflow-admin-secret"));
+        verify(userRepository, never()).save(any());
+    }
 }
