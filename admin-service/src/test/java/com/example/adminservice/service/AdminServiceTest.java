@@ -137,8 +137,8 @@ class AdminServiceTest {
 
         Decision approved = new Decision(); approved.setDecision(DecisionType.APPROVED);
         Decision rejected = new Decision(); rejected.setDecision(DecisionType.REJECTED);
-        when(decisionRepository.findByDecision(DecisionType.APPROVED)).thenReturn(List.of(approved));
-        when(decisionRepository.findByDecision(DecisionType.REJECTED)).thenReturn(List.of(rejected));
+        when(decisionRepository.findByDecisionType(DecisionType.APPROVED)).thenReturn(List.of(approved));
+        when(decisionRepository.findByDecisionType(DecisionType.REJECTED)).thenReturn(List.of(rejected));
 
         Map<String, Object> report = adminService.getReports();
 

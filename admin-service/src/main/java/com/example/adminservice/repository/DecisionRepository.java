@@ -8,5 +8,5 @@ import java.util.Optional;
 
 public interface DecisionRepository extends JpaRepository<Decision, Long> {
     Optional<Decision> findByApplicationId(Long applicationId);
-    List<Decision> findByDecision(Decision.DecisionType decision);
+    List<Decision> findByDecisionType(Decision.DecisionType decisionType);
 }

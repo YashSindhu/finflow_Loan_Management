@@ -108,8 +108,8 @@ public class AdminService {
         List<Map<String, Object>> allApps = getAllApplications();
         long total = allApps == null ? 0 : allApps.size();
 
-        long approved = decisionRepository.findByDecision(DecisionType.APPROVED).size();
-        long rejected = decisionRepository.findByDecision(DecisionType.REJECTED).size();
+        long approved = decisionRepository.findByDecisionType(DecisionType.APPROVED).size();
+        long rejected = decisionRepository.findByDecisionType(DecisionType.REJECTED).size();
         long pending = total - approved - rejected;
 
         Map<String, Object> report = new HashMap<>();
