@@ -1,0 +1,70 @@
+<div class="emi-section">
+  <div class="container">
+    <h2 style="text-align:center; margin-bottom:8px; color:#2c3e50">EMI Calculator</h2>
+    <p style="text-align:center; color:#7f8c8d; margin-bottom:32px; font-size:13px">Estimate your monthly EMI before applying</p>
+
+    <div class="emi-box">
+      <div class="emi-inputs">
+        <div class="emi-field">
+          <label>Loan Amount</label>
+          <div class="emi-input-wrap">
+            <span class="emi-prefix">₹</span>
+            <input type="number" [(ngModel)]="loanAmount" min="10000" max="50000000" step="10000" />
+          </div>
+          <input type="range" [(ngModel)]="loanAmount" min="10000" max="5000000" step="10000" class="emi-range" />
+          <div class="emi-range-labels"><span>₹10K</span><span>₹50L</span></div>
+        </div>
+
+        <div class="emi-field">
+          <label>Interest Rate (per annum)</label>
+          <div class="emi-input-wrap">
+            <input type="number" [(ngModel)]="interestRate" min="1" max="30" step="0.5" />
+            <span class="emi-suffix">%</span>
+          </div>
+          <input type="range" [(ngModel)]="interestRate" min="1" max="30" step="0.5" class="emi-range" />
+          <div class="emi-range-labels"><span>1%</span><span>30%</span></div>
+        </div>
+
+        <div class="emi-field">
+          <label>Tenure (Months)</label>
+          <div class="emi-input-wrap">
+            <input type="number" [(ngModel)]="tenureMonths" min="6" max="360" step="6" />
+            <span class="emi-suffix">mo</span>
+          </div>
+          <input type="range" [(ngModel)]="tenureMonths" min="6" max="360" step="6" class="emi-range" />
+          <div class="emi-range-labels"><span>6 mo</span><span>360 mo</span></div>
+        </div>
+      </div>
+
+      <div class="emi-result">
+        <div class="emi-monthly">
+          <div class="emi-label">Monthly EMI</div>
+          <div class="emi-value">₹{{ emi | number:'1.0-0' }}</div>
+        </div>
+        <div class="emi-breakdown">
+          <div class="emi-breakdown-item">
+            <span class="dot dot-principal"></span>
+            <div>
+              <div class="breakdown-label">Principal Amount</div>
+              <div class="breakdown-value">₹{{ loanAmount | number }}</div>
+            </div>
+          </div>
+          <div class="emi-breakdown-item">
+            <span class="dot dot-interest"></span>
+            <div>
+              <div class="breakdown-label">Total Interest</div>
+              <div class="breakdown-value">₹{{ totalInterest | number:'1.0-0' }}</div>
+            </div>
+          </div>
+          <div class="emi-breakdown-item" style="border-top:1px solid #eee; padding-top:12px; margin-top:4px">
+            <span class="dot dot-total"></span>
+            <div>
+              <div class="breakdown-label">Total Payment</div>
+              <div class="breakdown-value" style="font-weight:700; color:#2c3e50">₹{{ totalAmount | number:'1.0-0' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

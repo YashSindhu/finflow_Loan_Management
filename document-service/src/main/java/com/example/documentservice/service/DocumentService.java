@@ -1,9 +1,14 @@
 package com.example.documentservice.service;
 
-import com.example.documentservice.dto.VerifyRequest;
-import com.example.documentservice.entity.Document;
-import com.example.documentservice.entity.Document.DocumentStatus;
-import com.example.documentservice.repository.DocumentRepository;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,13 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import com.example.documentservice.dto.VerifyRequest;
+import com.example.documentservice.entity.Document;
+import com.example.documentservice.entity.Document.DocumentStatus;
+import com.example.documentservice.repository.DocumentRepository;
 
 @Service
 public class DocumentService {
@@ -38,18 +40,18 @@ public class DocumentService {
         String originalName = file.getOriginalFilename();
         if (originalName == null || originalName.isBlank()) {
             log.warn("Upload failed - invalid file name for email: {}", email);
-            throw new RuntimeException("Invalid file name");
+            throw new IllegalArgumentException("Invalid file name");
         }
         Path fileNamePath = Paths.get(originalName).getFileName();
         if (fileNamePath == null) {
-            throw new RuntimeException("Invalid file name");
+            throw new IllegalArgumentException("Invalid file name");
         }
         String safeName = fileNamePath.toString();
         String uniqueName = UUID.randomUUID() + "_" + safeName;
         Path filePath = dir.resolve(uniqueName).normalize();
         if (!filePath.startsWith(dir)) {
             log.warn("Upload failed - invalid file path detected for email: {}", email);
-            throw new RuntimeException("Invalid file path detected");
+            throw new IllegalArgumentException("Invalid file path detected");
         }
         Files.copy(file.getInputStream(), filePath);
 
@@ -77,7 +79,7 @@ public class DocumentService {
     public Document verify(Long id, VerifyRequest req) {
         log.info("Verifying document id: {} with status: {}", id, req.getStatus());
         Document doc = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + id));
+                .orElseThrow(() -> new NoSuchElementException("Document not found: " + id));
         doc.setStatus(DocumentStatus.valueOf(req.getStatus()));
         doc.setRemarks(req.getRemarks());
         doc.setVerifiedAt(LocalDateTime.now());
@@ -89,5 +91,10 @@ public class DocumentService {
     public List<Document> getAll() {
         log.debug("Fetching all documents");
         return repository.findAll();
+    }
+
+    public Document getById(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Document not found: " + id));
     }
 }

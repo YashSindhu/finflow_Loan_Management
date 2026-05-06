@@ -11,9 +11,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.core.io.Resource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -99,5 +102,78 @@ class DocumentControllerTest {
         ResponseEntity<List<Document>> response = controller.getAll("ROLE_USER");
         assertEquals(403, response.getStatusCode().value());
         verify(service, never()).getAll();
+    }
+
+    @Test
+    void viewMyDocument_returnsFileForOwner() throws IOException {
+        Path file = Files.createTempFile("document-owner", ".txt");
+        Files.writeString(file, "loan document");
+        document.setFilePath(file.toString());
+        document.setFileName("document-owner.txt");
+        when(service.getById(1L)).thenReturn(document);
+
+        ResponseEntity<Resource> response = controller.viewMyDocument(1L, "user@test.com");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("inline; filename=\"document-owner.txt\"",
+                response.getHeaders().getFirst("Content-Disposition"));
+        Files.deleteIfExists(file);
+    }
+
+    @Test
+    void viewMyDocument_returns403ForDifferentUser() throws IOException {
+        when(service.getById(1L)).thenReturn(document);
+
+        ResponseEntity<Resource> response = controller.viewMyDocument(1L, "other@test.com");
+
+        assertEquals(403, response.getStatusCode().value());
+    }
+
+    @Test
+    void viewMyDocument_returns404WhenFileMissing() throws IOException {
+        document.setFilePath(Path.of("missing-document.pdf").toAbsolutePath().toString());
+        document.setFileName("missing-document.pdf");
+        when(service.getById(1L)).thenReturn(document);
+
+        ResponseEntity<Resource> response = controller.viewMyDocument(1L, "user@test.com");
+
+        assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void viewDocument_returnsFileForAdmin() throws IOException {
+        Path file = Files.createTempFile("document-admin", ".txt");
+        Files.writeString(file, "loan document");
+        document.setFilePath(file.toString());
+        document.setFileName("document-admin.txt");
+        when(service.getById(1L)).thenReturn(document);
+
+        ResponseEntity<Resource> response = controller.viewDocument(1L, "ROLE_ADMIN");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("inline; filename=\"document-admin.txt\"",
+                response.getHeaders().getFirst("Content-Disposition"));
+        Files.deleteIfExists(file);
+    }
+
+    @Test
+    void viewDocument_returns403ForNonAdmin() throws IOException {
+        ResponseEntity<Resource> response = controller.viewDocument(1L, "ROLE_USER");
+
+        assertEquals(403, response.getStatusCode().value());
+        verify(service, never()).getById(anyLong());
+    }
+
+    @Test
+    void viewDocument_returns404WhenFileMissing() throws IOException {
+        document.setFilePath(Path.of("missing-admin-document.pdf").toAbsolutePath().toString());
+        document.setFileName("missing-admin-document.pdf");
+        when(service.getById(1L)).thenReturn(document);
+
+        ResponseEntity<Resource> response = controller.viewDocument(1L, "ROLE_ADMIN");
+
+        assertEquals(404, response.getStatusCode().value());
     }
 }

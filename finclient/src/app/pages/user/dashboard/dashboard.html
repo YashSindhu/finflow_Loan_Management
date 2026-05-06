@@ -1,0 +1,61 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header flex-between">
+    <div>
+      <h1>My Dashboard</h1>
+      <p>Track your loan applications</p>
+    </div>
+    <a routerLink="/user/apply" class="btn btn-primary">+ New Application</a>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading your applications...</div>
+  }
+
+  @if (!loading && applications.length === 0) {
+    <div class="card text-center">
+      <p style="color:#7f8c8d; padding: 20px 0">No applications yet. Start by applying for a loan.</p>
+      <a routerLink="/user/apply" class="btn btn-primary">Apply Now</a>
+    </div>
+  }
+
+  @if (!loading && applications.length > 0) {
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Loan Amount</th>
+              <th>Purpose</th>
+              <th>Tenure</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (app of applications; track app.id) {
+              <tr>
+                <td>{{ app.id }}</td>
+                <td>₹{{ app.loanAmount | number }}</td>
+                <td>{{ app.loanPurpose }}</td>
+                <td>{{ app.tenureMonths }} months</td>
+                <td><span [class]="'badge ' + getBadgeClass(app.status)">{{ app.status }}</span></td>
+                <td>{{ app.createdAt | date:'dd MMM yyyy' }}</td>
+                <td>
+                  @if (app.status === 'DRAFT') {
+                    <a [routerLink]="['/user/apply']" [queryParams]="{id: app.id}" class="btn btn-sm btn-secondary">Edit</a>
+                  }
+                  <a [routerLink]="['/user/status', app.id]" class="btn btn-sm btn-primary" style="margin-left:4px">Track</a>
+                  <a [routerLink]="['/user/documents']" [queryParams]="{appId: app.id}" class="btn btn-sm btn-secondary" style="margin-left:4px">Docs</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

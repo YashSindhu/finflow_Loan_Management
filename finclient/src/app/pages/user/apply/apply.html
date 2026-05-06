@@ -1,0 +1,163 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header">
+    <h1>{{ isEdit ? 'Edit Application' : 'New Loan Application' }}</h1>
+    <p>Complete all steps to submit your application</p>
+  </div>
+
+  @if (error)   { <div class="alert alert-error">{{ error }}</div> }
+  @if (success) { <div class="alert alert-success">{{ success }}</div> }
+
+  <!-- Stepper -->
+  <div class="stepper">
+    @for (step of steps; track step; let i = $index) {
+      <div class="step" [class.active]="currentStep === i" [class.done]="currentStep > i" (click)="goToStep(i)" style="cursor:pointer">
+        <div class="step-circle">
+          @if (currentStep > i) { ✓ } @else { {{ i + 1 }} }
+        </div>
+        <div class="step-label">{{ step }}</div>
+      </div>
+      @if (i < steps.length - 1) {
+        <div class="step-line" [class.done]="currentStep > i"></div>
+      }
+    }
+  </div>
+
+  <div class="card">
+    <form #f="ngForm">
+
+      <!-- Step 0: Personal -->
+      @if (currentStep === 0) {
+        <div class="step-content">
+          <h3 style="margin-bottom:20px; color:#2c3e50">Personal Information</h3>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" name="fullName" [(ngModel)]="form.fullName" required placeholder="As per ID" />
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="text" name="phone" [(ngModel)]="form.phone" required placeholder="10-digit mobile number" />
+            </div>
+            <div class="form-group">
+              <label>Date of Birth</label>
+              <input type="date" name="dateOfBirth" [(ngModel)]="form.dateOfBirth" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <textarea name="address" [(ngModel)]="form.address" required rows="2" placeholder="Full residential address"></textarea>
+          </div>
+          <div class="step-nav">
+            <button type="button" class="btn btn-primary" (click)="next()" [disabled]="!form.fullName || !form.phone || !form.dateOfBirth || !form.address">
+              Next: Employment →
+            </button>
+            <a routerLink="/user/dashboard" class="btn btn-secondary">Cancel</a>
+          </div>
+        </div>
+      }
+
+      <!-- Step 1: Employment -->
+      @if (currentStep === 1) {
+        <div class="step-content">
+          <h3 style="margin-bottom:20px; color:#2c3e50">Employment Details</h3>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Employment Type</label>
+              <select name="employmentType" [(ngModel)]="form.employmentType" required>
+                <option value="">Select...</option>
+                <option value="SALARIED">Salaried</option>
+                <option value="SELF_EMPLOYED">Self Employed</option>
+                <option value="BUSINESS">Business</option>
+                <option value="UNEMPLOYED">Unemployed</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Employer / Company Name</label>
+              <input type="text" name="employerName" [(ngModel)]="form.employerName" required placeholder="Company name" />
+            </div>
+            <div class="form-group">
+              <label>Monthly Income (₹)</label>
+              <input type="number" name="monthlyIncome" [(ngModel)]="form.monthlyIncome" required min="1000" />
+            </div>
+          </div>
+          <div class="step-nav">
+            <button type="button" class="btn btn-secondary" (click)="prev()">← Back</button>
+            <button type="button" class="btn btn-primary" (click)="next()" [disabled]="!form.employmentType || !form.employerName || !form.monthlyIncome">
+              Next: Loan Details →
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Step 2: Loan Details -->
+      @if (currentStep === 2) {
+        <div class="step-content">
+          <h3 style="margin-bottom:20px; color:#2c3e50">Loan Details</h3>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Loan Amount (₹)</label>
+              <input type="number" name="loanAmount" [(ngModel)]="form.loanAmount" required min="10000" />
+            </div>
+            <div class="form-group">
+              <label>Tenure (Months)</label>
+              <select name="tenureMonths" [(ngModel)]="form.tenureMonths" required>
+                <option value="">Select...</option>
+                <option [value]="12">12 months</option>
+                <option [value]="24">24 months</option>
+                <option [value]="36">36 months</option>
+                <option [value]="48">48 months</option>
+                <option [value]="60">60 months</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Loan Purpose</label>
+              <select name="loanPurpose" [(ngModel)]="form.loanPurpose" required>
+                <option value="">Select...</option>
+                <option value="HOME">Home</option>
+                <option value="PERSONAL">Personal</option>
+                <option value="BUSINESS">Business</option>
+                <option value="EDUCATION">Education</option>
+                <option value="VEHICLE">Vehicle</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="step-nav">
+            <button type="button" class="btn btn-secondary" (click)="prev()">← Back</button>
+            <button type="button" class="btn btn-primary" (click)="saveDraft()" [disabled]="loading || !form.loanAmount || !form.tenureMonths || !form.loanPurpose">
+              {{ loading ? 'Saving...' : 'Save & Review →' }}
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Step 3: Review -->
+      @if (currentStep === 3) {
+        <div class="step-content">
+          <h3 style="margin-bottom:20px; color:#2c3e50">Review Your Application</h3>
+          <div class="review-grid">
+            <div class="review-item"><label>Full Name</label><p>{{ form.fullName }}</p></div>
+            <div class="review-item"><label>Phone</label><p>{{ form.phone }}</p></div>
+            <div class="review-item"><label>Date of Birth</label><p>{{ form.dateOfBirth }}</p></div>
+            <div class="review-item"><label>Address</label><p>{{ form.address }}</p></div>
+            <div class="review-item"><label>Employment Type</label><p>{{ form.employmentType }}</p></div>
+            <div class="review-item"><label>Employer</label><p>{{ form.employerName }}</p></div>
+            <div class="review-item"><label>Monthly Income</label><p>₹{{ form.monthlyIncome }}</p></div>
+            <div class="review-item"><label>Loan Amount</label><p>₹{{ form.loanAmount }}</p></div>
+            <div class="review-item"><label>Tenure</label><p>{{ form.tenureMonths }} months</p></div>
+            <div class="review-item"><label>Loan Purpose</label><p>{{ form.loanPurpose }}</p></div>
+          </div>
+          <div class="step-nav" style="margin-top:24px">
+            <button type="button" class="btn btn-secondary" (click)="prev()">← Edit</button>
+            <button type="button" class="btn btn-success" (click)="submitApplication()" [disabled]="loading">
+              {{ loading ? 'Submitting...' : '✓ Submit Application' }}
+            </button>
+          </div>
+        </div>
+      }
+
+    </form>
+  </div>
+</div>

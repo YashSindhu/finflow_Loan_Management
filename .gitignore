@@ -3,6 +3,12 @@ target/
 *.jar
 *.war
 
+# SonarQube scanner output
+.scannerwork/
+
+# Local SonarLint IDE metadata
+.sonarlint/
+
 # Eclipse
 .metadata/
 .classpath

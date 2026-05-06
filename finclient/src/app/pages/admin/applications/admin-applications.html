@@ -1,0 +1,72 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header">
+    <h1>All Applications</h1>
+    <p>Review and manage loan applications</p>
+  </div>
+
+  <!-- Search and Filter -->
+  <div class="card" style="padding:16px; margin-bottom:16px">
+    <div class="grid-2" style="gap:12px">
+      <div class="form-group" style="margin:0">
+        <input type="text" [(ngModel)]="searchText" placeholder="Search by name or email..." />
+      </div>
+      <div class="form-group" style="margin:0">
+        <select [(ngModel)]="filterStatus">
+          <option value="">All Statuses</option>
+          <option value="DRAFT">Draft</option>
+          <option value="SUBMITTED">Submitted</option>
+          <option value="DOCS_PENDING">Docs Pending</option>
+          <option value="DOCS_VERIFIED">Docs Verified</option>
+          <option value="UNDER_REVIEW">Under Review</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:8px; font-size:12px; color:#7f8c8d">
+      Showing {{ filtered.length }} of {{ applications.length }} applications
+    </div>
+  </div>
+
+  @if (loading) { <div class="loading">Loading...</div> }
+
+  <div class="card">
+    @if (!loading && filtered.length === 0) {
+      <p style="text-align:center; color:#7f8c8d; padding:20px">No applications match your search.</p>
+    }
+    @if (!loading && filtered.length > 0) {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Applicant</th>
+              <th>Amount</th>
+              <th>Purpose</th>
+              <th>Tenure</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (app of filtered; track app.id) {
+              <tr>
+                <td>{{ app.id }}</td>
+                <td>{{ app.email || app.fullName }}</td>
+                <td>₹{{ app.loanAmount | number }}</td>
+                <td>{{ app.loanPurpose }}</td>
+                <td>{{ app.tenureMonths }} mo</td>
+                <td><span [class]="'badge ' + getBadgeClass(app.status)">{{ app.status }}</span></td>
+                <td>
+                  <a [routerLink]="['/admin/applications', app.id]" class="btn btn-sm btn-primary">Review</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

@@ -186,4 +186,143 @@ class AuthServiceTest {
                 () -> authService.registerAdmin(req, "finflow-admin-secret"));
         verify(userRepository, never()).save(any());
     }
+
+    @Test
+    void registerSuperAdmin_savesSuperAdminWithCorrectSecret() {
+        RegisterRequest req = new RegisterRequest();
+        req.setName("Super Admin");
+        req.setEmail("super@test.com");
+        req.setPassword("Super@123");
+
+        when(userRepository.findByEmail("super@test.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Super@123")).thenReturn("encodedSuper");
+
+        String result = authService.registerSuperAdmin(req, "finflow-super-secret");
+
+        assertEquals("Super admin registered successfully", result);
+        verify(userRepository).save(argThat(saved -> "ROLE_SUPER_ADMIN".equals(saved.getRole())));
+    }
+
+    @Test
+    void registerSuperAdmin_throwsForInvalidSecret() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("super@test.com");
+
+        assertThrows(RuntimeException.class,
+                () -> authService.registerSuperAdmin(req, "wrong-secret"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void registerSuperAdmin_throwsIfEmailAlreadyExists() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("super@test.com");
+
+        when(userRepository.findByEmail("super@test.com")).thenReturn(Optional.of(user));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.registerSuperAdmin(req, "finflow-super-secret"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getProfile_returnsUserByEmail() {
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+
+        User result = authService.getProfile("user@test.com");
+
+        assertEquals("Yash Sindhu", result.getName());
+    }
+
+    @Test
+    void getProfile_throwsIfUserNotFound() {
+        when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> authService.getProfile("missing@test.com"));
+    }
+
+    @Test
+    void updateProfile_updatesNameAndEmail() {
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("new@test.com")).thenReturn(Optional.empty());
+        when(userRepository.save(user)).thenReturn(user);
+
+        User result = authService.updateProfile("user@test.com", "New Name", "new@test.com");
+
+        assertEquals("New Name", result.getName());
+        assertEquals("new@test.com", result.getEmail());
+    }
+
+    @Test
+    void updateProfile_keepsExistingValuesForBlankInput() {
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        User result = authService.updateProfile("user@test.com", " ", "user@test.com");
+
+        assertEquals("Yash Sindhu", result.getName());
+        assertEquals("user@test.com", result.getEmail());
+        verify(userRepository, never()).findByEmail("new@test.com");
+    }
+
+    @Test
+    void updateProfile_throwsIfNewEmailAlreadyExists() {
+        User otherUser = new User();
+        otherUser.setEmail("taken@test.com");
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("taken@test.com")).thenReturn(Optional.of(otherUser));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.updateProfile("user@test.com", "New Name", "taken@test.com"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void changePassword_updatesEncodedPassword() {
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("oldPassword", "encodedPassword")).thenReturn(true);
+        when(passwordEncoder.encode("newPassword")).thenReturn("newEncodedPassword");
+
+        authService.changePassword("user@test.com", "oldPassword", "newPassword");
+
+        assertEquals("newEncodedPassword", user.getPassword());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void changePassword_throwsForWrongCurrentPassword() {
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrongPassword", "encodedPassword")).thenReturn(false);
+
+        assertThrows(RuntimeException.class,
+                () -> authService.changePassword("user@test.com", "wrongPassword", "newPassword"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteUser_deletesRegularUserForAdmin() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        authService.deleteUser(1L, "ROLE_ADMIN");
+
+        verify(userRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteUser_blocksAdminDeletingAdmin() {
+        user.setRole("ROLE_ADMIN");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertThrows(RuntimeException.class, () -> authService.deleteUser(1L, "ROLE_ADMIN"));
+        verify(userRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteUser_blocksSuperAdminDeletingSuperAdmin() {
+        user.setRole("ROLE_SUPER_ADMIN");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertThrows(RuntimeException.class, () -> authService.deleteUser(1L, "ROLE_SUPER_ADMIN"));
+        verify(userRepository, never()).deleteById(anyLong());
+    }
 }

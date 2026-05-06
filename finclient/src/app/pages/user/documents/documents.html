@@ -1,0 +1,92 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header">
+    <h1>My Documents</h1>
+    <p>Upload documents for your loan applications</p>
+  </div>
+
+  @if (error) { <div class="alert alert-error">{{ error }}</div> }
+  @if (success) { <div class="alert alert-success">{{ success }}</div> }
+
+  <!-- Upload Section -->
+  <div class="card">
+    <h3 style="margin-bottom:16px; font-size:15px">Upload Document</h3>
+    <form (ngSubmit)="upload()" #f="ngForm">
+      <div class="grid-3">
+        <div class="form-group">
+          <label>Application ID</label>
+          <input type="number" name="applicationId" [(ngModel)]="uploadForm.applicationId" required placeholder="e.g. 1" />
+        </div>
+        <div class="form-group">
+          <label>Document Type</label>
+          <select name="documentType" [(ngModel)]="uploadForm.documentType" required>
+            <option value="">Select...</option>
+            <option value="AADHAAR">Aadhaar Card</option>
+            <option value="PAN">PAN Card</option>
+            <option value="SALARY_SLIP">Salary Slip</option>
+            <option value="BANK_STATEMENT">Bank Statement</option>
+            <option value="PHOTO">Photograph</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>File</label>
+          <input type="file" (change)="onFileChange($event)" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" [disabled]="uploading">
+        {{ uploading ? 'Uploading...' : 'Upload' }}
+      </button>
+    </form>
+  </div>
+
+  <!-- Documents List -->
+  <div class="card">
+    <h3 style="margin-bottom:16px; font-size:15px">Uploaded Documents</h3>
+    @if (loading) { <div class="loading">Loading...</div> }
+    @if (!loading && documents.length === 0) {
+      <p style="color:#7f8c8d; text-align:center; padding:20px">No documents uploaded yet.</p>
+    }
+    @if (!loading && documents.length > 0) {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Application ID</th>
+              <th>Type</th>
+              <th>File Name</th>
+              <th>Status</th>
+              <th>Remarks</th>
+              <th>Uploaded</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (doc of documents; track doc.id) {
+              <tr>
+                <td>{{ doc.id }}</td>
+                <td>{{ doc.applicationId }}</td>
+                <td>{{ doc.documentType }}</td>
+                <td>{{ doc.fileName }}</td>
+                <td><span [class]="'badge ' + getDocBadge(doc.status)">{{ doc.status }}</span></td>
+                <td>{{ doc.remarks || '—' }}</td>
+                <td>{{ (doc.uploadedAt || doc.createdAt) | date:'dd MMM yyyy' }}</td>
+                <td>
+                  @if (doc.status === 'REJECTED') {
+                    <label class="btn btn-sm btn-primary" style="cursor:pointer">
+                      Re-upload
+                      <input type="file" style="display:none" (change)="reUpload($event, doc.applicationId, doc.documentType)" />
+                    </label>
+                  }
+                  <button class="btn btn-sm btn-secondary" style="margin-left:4px" (click)="viewDoc(doc.id)">View</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

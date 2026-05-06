@@ -1,6 +1,6 @@
 # 🏦 FinFlow — Loan Management System
 
-A production-ready **microservices-based Loan Management System** built with Spring Boot, Spring Cloud, Docker, RabbitMQ, PostgreSQL, and JWT Authentication.
+A production-ready **microservices-based Loan Management System** built with Spring Boot, Spring Cloud, Angular, Docker, RabbitMQ, PostgreSQL, and JWT Authentication.
 
 ---
 
@@ -9,40 +9,48 @@ A production-ready **microservices-based Loan Management System** built with Spr
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Microservices](#microservices)
+- [Frontend](#frontend)
 - [Getting Started](#getting-started)
 - [API Endpoints](#api-endpoints)
 - [Complete Workflow](#complete-workflow)
+- [Messaging & DLQ](#messaging--dlq)
 - [Testing](#testing)
+- [Code Quality](#code-quality)
 - [CI/CD](#cicd)
 - [Project Structure](#project-structure)
+- [Important URLs](#important-urls)
+- [Test Credentials](#test-credentials)
 
 ---
 
 ## Overview
 
-FinFlow allows users to apply for loans, upload documents, and track their application status. Admins can review applications, verify documents, make decisions, and view reports — all through a secure JWT-authenticated REST API.
+FinFlow is a full-stack Loan Management System where:
+- **Users** can register, apply for loans, upload documents, and track application status
+- **Admins** can review applications, verify documents, make approve/reject decisions, and view reports
+- All communication is secured via **JWT Authentication**
+- Events are published reliably via **RabbitMQ Outbox Pattern with DLQ**
 
 ---
 
 ## Architecture
 
 ```
-Client
-  │
-  ▼
-API Gateway (8080)  ──── JWT Validation
-  │
-  ├──► auth-service        (8081)
-  ├──► application-service (8082)
-  ├──► document-service    (8083)
-  └──► admin-service       (8084)
-  
+Angular Frontend (4200)
+        │
+        ▼
+API Gateway (8080)  ──── JWT Validation (JwtAuthFilter)
+        │
+        ├──► auth-service        (8081)  ── PostgreSQL (finflow_auth)
+        ├──► application-service (8082)  ── PostgreSQL (finflow_application)
+        ├──► document-service    (8083)  ── PostgreSQL (finflow_document)
+        └──► admin-service       (8084)  ── PostgreSQL (finflow_admin)
+
 Supporting Services:
-  ├── Eureka Server   (8761)  — Service Discovery
-  ├── Config Server   (8888)  — Centralized Config
-  ├── PostgreSQL      (5432)  — Database
-  ├── RabbitMQ        (5672)  — Messaging
-  └── Zipkin          (9411)  — Distributed Tracing
+        ├── Eureka Server   (8761)  — Service Discovery
+        ├── Config Server   (8888)  — Centralized Configuration
+        ├── RabbitMQ        (5672)  — Async Messaging + DLQ
+        └── Zipkin          (9411)  — Distributed Tracing
 ```
 
 ---
@@ -53,16 +61,18 @@ Supporting Services:
 |---|---|
 | Language | Java 17 |
 | Framework | Spring Boot 3.5.12 |
+| Frontend | Angular 21 |
 | Service Discovery | Spring Cloud Netflix Eureka |
 | Config Management | Spring Cloud Config Server |
 | API Gateway | Spring Cloud Gateway |
 | Security | Spring Security + JWT (JJWT) |
 | Database | PostgreSQL 15 |
-| Messaging | RabbitMQ 3 (Outbox Pattern) |
+| Messaging | RabbitMQ 3 (Outbox Pattern + DLQ) |
 | Tracing | Zipkin |
 | API Docs | Swagger (SpringDoc OpenAPI) |
 | Logging | SLF4J + Logback |
 | Testing | JUnit 5 + Mockito |
+| Code Quality | SonarLint + SpotBugs + JaCoCo |
 | Containerization | Docker + Docker Compose |
 | CI/CD | GitHub Actions |
 | Registry | Docker Hub |
@@ -73,7 +83,7 @@ Supporting Services:
 
 ### 🔐 Auth Service (8081)
 Handles user registration, login, and JWT token management.
-- Register users and admins
+- Register users (`ROLE_USER`) and admins (`ROLE_ADMIN`)
 - Login and get JWT token
 - Validate tokens
 - Admin user management
@@ -96,6 +106,21 @@ Admin operations, decisions, and reporting.
 - Make APPROVE/REJECT decisions
 - Generate reports
 - Consumes RabbitMQ events
+- Dead Letter Queue (DLQ) consumer
+
+---
+
+## Frontend
+
+Angular 21 frontend running on port **4200** with:
+- Login / Register pages
+- User Dashboard
+- Apply for Loan (multi-step form)
+- My Applications
+- Upload Documents
+- Admin Dashboard
+- Admin Applications Management
+- Admin Reports & Analytics
 
 ---
 
@@ -105,6 +130,7 @@ Admin operations, decisions, and reporting.
 - Docker Desktop installed and running
 - Java 17
 - Maven
+- Node.js + Angular CLI (for frontend development)
 
 ### Run with Docker
 
@@ -126,15 +152,16 @@ mvn clean package -DskipTests -f api-gateway/pom.xml
 docker-compose up -d
 ```
 
-Wait ~1 minute for all services to start, then open:
-
-```
-http://localhost:8080/swagger-ui.html
-```
+Wait ~1 minute for all services to start.
 
 ### Stop
 ```bash
 docker-compose down
+```
+
+### Wipe all data
+```bash
+docker-compose down -v
 ```
 
 ---
@@ -147,7 +174,7 @@ All requests go through the API Gateway at `http://localhost:8080`
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | POST | `/gateway/auth/register` | Register user | Public |
-| POST | `/gateway/auth/register/admin` | Register admin | Secret Key |
+| POST | `/gateway/auth/register/admin` | Register admin | X-Admin-Secret header |
 | POST | `/gateway/auth/login` | Login | Public |
 | GET | `/gateway/auth/validate` | Validate token | Public |
 | GET | `/gateway/auth/admin/users` | Get all users | ROLE_ADMIN |
@@ -186,16 +213,16 @@ All requests go through the API Gateway at `http://localhost:8080`
 ## Complete Workflow
 
 ```
-1. Register User       POST /gateway/auth/register
-2. Register Admin      POST /gateway/auth/register/admin  (X-Admin-Secret: finflow-admin-secret)
-3. User Login          POST /gateway/auth/login  →  copy JWT token
-4. Create Application  POST /gateway/applications
-5. Submit Application  POST /gateway/applications/1/submit
-6. Upload Document     POST /gateway/documents/upload
-7. Admin Login         POST /gateway/auth/login (admin credentials)
-8. Verify Document     PUT  /gateway/documents/admin/1/verify
-9. Make Decision       POST /gateway/admin/applications/1/decision
-10. View Reports       GET  /gateway/admin/reports
+1.  Register User       POST /gateway/auth/register
+2.  Register Admin      POST /gateway/auth/register/admin  (X-Admin-Secret: finflow-admin-secret)
+3.  User Login          POST /gateway/auth/login  →  copy JWT token
+4.  Create Application  POST /gateway/applications
+5.  Submit Application  POST /gateway/applications/1/submit
+6.  Upload Document     POST /gateway/documents/upload
+7.  Admin Login         POST /gateway/auth/login (admin credentials)
+8.  Verify Document     PUT  /gateway/documents/admin/1/verify
+9.  Make Decision       POST /gateway/admin/applications/1/decision
+10. View Reports        GET  /gateway/admin/reports
 ```
 
 ### Application Status Flow
@@ -203,7 +230,11 @@ All requests go through the API Gateway at `http://localhost:8080`
 DRAFT → SUBMITTED → DOCS_PENDING → DOCS_VERIFIED → UNDER_REVIEW → APPROVED / REJECTED
 ```
 
-### RabbitMQ Outbox Pattern
+---
+
+## Messaging & DLQ
+
+### Outbox Pattern
 ```
 Submit Application
       │
@@ -219,6 +250,27 @@ Publish to RabbitMQ (finflow.exchange)
       ▼
 admin-service consumes via @RabbitListener
 ```
+
+### Dead Letter Queue (DLQ)
+```
+application.submitted.queue
+      │
+      │ (if message fails)
+      ▼
+finflow.dlq.exchange
+      │
+      ▼
+application.submitted.dlq
+      │
+      ▼
+DeadLetterQueueConsumer logs failed message
+```
+
+### RabbitMQ Queues
+| Queue | Purpose |
+|---|---|
+| `application.submitted.queue` | Main queue for application events |
+| `application.submitted.dlq` | Dead letter queue for failed messages |
 
 ---
 
@@ -238,12 +290,42 @@ mvn test -pl document-service
 ```
 
 ### Test Coverage
-| Service | Tests |
-|---|---|
-| application-service | LoanApplicationServiceTest (11), OutboxEventPublisherTest (3) |
-| auth-service | AuthServiceTest (7), JwtUtilTest (6) |
-| admin-service | AdminServiceTest (8) |
-| document-service | DocumentServiceTest (8) |
+| Service | Tests | Coverage |
+|---|---|---|
+| auth-service | 48 | 89% |
+| application-service | 36 | 89% |
+| admin-service | 42 | 92% |
+| document-service | 25 | 90% |
+| **Total** | **151** | **~90%** |
+
+### Generate JaCoCo Coverage Report
+```bash
+mvn test -f auth-service/pom.xml
+# Open: auth-service/target/site/jacoco/index.html
+```
+
+---
+
+## Code Quality
+
+### SonarLint
+Integrated in Eclipse IDE for real-time code quality feedback.
+
+Issues fixed:
+- Constructor injection instead of field injection
+- Constants for duplicate string literals
+- Specific exceptions instead of RuntimeException
+- Removed duplicate methods
+
+### SpotBugs
+```bash
+mvn compile spotbugs:check -f auth-service/pom.xml
+mvn compile spotbugs:check -f application-service/pom.xml
+mvn compile spotbugs:check -f admin-service/pom.xml
+mvn compile spotbugs:check -f document-service/pom.xml
+```
+
+Bug fixed: Null pointer dereference in `DocumentService.upload()` — `getFileName()` could return null.
 
 ---
 
@@ -275,6 +357,12 @@ yashsindhu/finflow-admin-service
 yashsindhu/finflow-api-gateway
 ```
 
+### GitHub Secrets Required
+| Secret | Value |
+|---|---|
+| `DOCKER_USERNAME` | yashsindhu |
+| `DOCKER_PASSWORD` | Docker Hub access token |
+
 ---
 
 ## Project Structure
@@ -290,12 +378,15 @@ finflow/
 ├── document-service/           Document management
 ├── admin-service/              Admin operations
 ├── api-gateway/                Gateway & routing
+├── finclient/                  Angular frontend
 ├── docker-compose.yml          Docker orchestration
 ├── init-db.sql                 Database initialization
 ├── .github/
 │   └── workflows/
 │       └── ci-cd.yml           CI/CD pipeline
-└── FINFLOW_DOCUMENTATION.txt   Complete documentation
+├── FINFLOW_DOCUMENTATION.txt   Complete documentation
+├── TESTING_GUIDE.txt           Endpoint testing guide
+└── VIVA_GUIDE.txt              Viva preparation guide
 ```
 
 ---
@@ -304,6 +395,7 @@ finflow/
 
 | Service | URL |
 |---|---|
+| Angular Frontend | http://localhost:4200 |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Eureka Dashboard | http://localhost:8761 |
 | RabbitMQ Dashboard | http://localhost:15672 (guest/guest) |
@@ -319,7 +411,7 @@ finflow/
 | User | user@test.com | Password@123 |
 | Admin | admin@test.com | Admin@123 |
 
-Admin Registration Secret: `finflow-admin-secret`
+**Admin Registration Secret:** `finflow-admin-secret`
 
 ---
 
@@ -332,14 +424,19 @@ docker-compose up -d
 # Stop all services
 docker-compose down
 
-# View logs
+# View logs of a service
 docker logs <service-name> -f
 
 # Check status
 docker ps
 
-# Wipe all data
-docker-compose down -v
+# After code changes
+mvn clean package -DskipTests -f <service>/pom.xml
+docker cp <service>/target/<service>-0.0.1-SNAPSHOT.jar <service>:/app/app.jar
+docker restart <service>
+
+# Push to GitHub (triggers CI/CD)
+git add . && git commit -m "message" && git push
 ```
 
 ---
@@ -362,4 +459,4 @@ git add . && git commit -m "your message" && git push
 
 ---
 
-<p align="center">Built with ❤️ using Spring Boot & Spring Cloud</p>
+<p align="center">Built with ❤️ using Spring Boot, Spring Cloud & Angular</p>

@@ -1,0 +1,56 @@
+/* Stepper */
+.stepper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 0;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  max-width: 160px;
+}
+.step-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ecf0f1;
+  color: #7f8c8d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  border: 2px solid #ddd;
+  z-index: 1;
+  transition: all 0.3s;
+}
+.step.active .step-circle  { background: #4a90e2; color: #fff; border-color: #4a90e2; }
+.step.done .step-circle    { background: #27ae60; color: #fff; border-color: #27ae60; }
+.step-label { font-size: 11px; color: #7f8c8d; margin-top: 6px; text-align: center; }
+.step.active .step-label   { color: #4a90e2; font-weight: 600; }
+.step.done .step-label     { color: #27ae60; }
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: #ddd;
+  margin-bottom: 22px;
+  transition: background 0.3s;
+}
+.step-line.done { background: #27ae60; }
+
+/* Step content */
+.step-content { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.step-nav { display: flex; gap: 8px; margin-top: 24px; }
+
+/* Review section */
+.review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+.review-item label { font-size: 11px; color: #7f8c8d; text-transform: uppercase; }
+.review-item p { font-size: 14px; color: #2c3e50; font-weight: 500; margin-top: 2px; }

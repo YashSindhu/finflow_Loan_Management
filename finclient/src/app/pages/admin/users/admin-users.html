@@ -1,0 +1,60 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header">
+    <h1>Users</h1>
+    <p>Manage registered users and their roles</p>
+  </div>
+
+  @if (loading) { <div class="loading">Loading...</div> }
+  @if (error) { <div class="alert alert-error">{{ error }}</div> }
+  @if (success) { <div class="alert alert-success">{{ success }}</div> }
+
+  <div class="card">
+    @if (!loading && users.length > 0) {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            @for (user of users; track user.id) {
+              <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>
+                  <span [class]="getRoleBadge(user.role)">{{ getRoleLabel(user.role) }}</span>
+                </td>
+                <td>
+                  <!-- Admin can promote users to admin -->
+                  @if (auth.isSuperAdmin() && user.role === 'ROLE_USER') {
+                    <button class="btn btn-sm btn-secondary" (click)="promoteToAdmin(user.id)" style="margin-right:4px">
+                      Make Admin
+                    </button>
+                  }
+                  <!-- Admin can remove regular users -->
+                  @if (auth.isAdmin() && user.role === 'ROLE_USER' && user.email !== auth.getEmail()) {
+                    <button class="btn btn-sm btn-danger" (click)="removeUser(user.id, user.name)">
+                      Remove
+                    </button>
+                  }
+                  <!-- Super admin can remove admins -->
+                  @if (auth.isSuperAdmin() && user.role === 'ROLE_ADMIN') {
+                    <button class="btn btn-sm btn-danger" (click)="removeUser(user.id, user.name)">
+                      Remove Admin
+                    </button>
+                  }
+                  <!-- Can't remove yourself or other super admins -->
+                  @if (user.email === auth.getEmail()) {
+                    <span style="font-size:11px; color:#7f8c8d">You</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

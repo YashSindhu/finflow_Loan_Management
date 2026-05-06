@@ -1,17 +1,26 @@
 package com.example.applicationservice.controller;
 
-import com.example.applicationservice.dto.LoanApplicationRequest;
-import com.example.applicationservice.entity.LoanApplication;
-import com.example.applicationservice.service.LoanApplicationService;
-import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
+import com.example.applicationservice.dto.LoanApplicationRequest;
+import com.example.applicationservice.entity.LoanApplication;
+import com.example.applicationservice.service.LoanApplicationService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/applications")
@@ -65,7 +74,7 @@ public class LoanApplicationController {
     @GetMapping("/admin/all")
     public ResponseEntity<List<LoanApplication>> getAll(
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!"ROLE_ADMIN".equals(role)) {
+        if (!"ROLE_ADMIN".equals(role) && !"ROLE_SUPER_ADMIN".equals(role)) {
             log.warn("GET /applications/admin/all - access denied for role: {}", role);
             return ResponseEntity.status(403).build();
         }
@@ -77,7 +86,7 @@ public class LoanApplicationController {
     public ResponseEntity<LoanApplication> getById(
             @PathVariable Long id,
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!"ROLE_ADMIN".equals(role)) {
+        if (!"ROLE_ADMIN".equals(role) && !"ROLE_SUPER_ADMIN".equals(role)) {
             log.warn("GET /applications/admin/{} - access denied for role: {}", id, role);
             return ResponseEntity.status(403).build();
         }

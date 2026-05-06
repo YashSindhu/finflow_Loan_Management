@@ -1,0 +1,146 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header flex-between">
+    <div>
+      <h1>Application #{{ applicationId }}</h1>
+      <p>Review and make a decision</p>
+    </div>
+    <a routerLink="/admin/applications" class="btn btn-secondary">← Back</a>
+  </div>
+
+  @if (loading) { <div class="loading">Loading...</div> }
+  @if (error) { <div class="alert alert-error">{{ error }}</div> }
+  @if (success) { <div class="alert alert-success">{{ success }}</div> }
+
+  @if (!loading && application) {
+    <!-- Application Info -->
+    <div class="card">
+      <h3 style="margin-bottom:16px; font-size:15px">Applicant Details</h3>
+      <div class="grid-2">
+        <div><strong>Name:</strong> {{ application.fullName }}</div>
+        <div><strong>Email:</strong> {{ application.email }}</div>
+        <div><strong>Phone:</strong> {{ application.phone }}</div>
+        <div><strong>DOB:</strong> {{ application.dateOfBirth | date:'dd MMM yyyy' }}</div>
+        <div><strong>Employment:</strong> {{ application.employmentType }}</div>
+        <div><strong>Employer:</strong> {{ application.employerName }}</div>
+        <div><strong>Monthly Income:</strong> ₹{{ application.monthlyIncome | number }}</div>
+        <div><strong>Loan Amount:</strong> ₹{{ application.loanAmount | number }}</div>
+        <div><strong>Tenure:</strong> {{ application.tenureMonths }} months</div>
+        <div><strong>Purpose:</strong> {{ application.loanPurpose }}</div>
+        <div><strong>Status:</strong> <span [class]="'badge ' + getBadgeClass(application.status)">{{ application.status }}</span></div>
+        <div><strong>Address:</strong> {{ application.address }}</div>
+      </div>
+    </div>
+
+    <!-- Documents -->
+    @if (documents.length > 0) {
+      <div class="card">
+        <h3 style="margin-bottom:16px; font-size:15px">Documents</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Type</th><th>File</th><th>Status</th><th>Remarks</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              @for (doc of documents; track doc.id) {
+                <tr>
+                  <td>{{ doc.documentType }}</td>
+                  <td>{{ doc.fileName }}</td>
+                  <td><span [class]="'badge ' + getDocBadge(doc.status)">{{ doc.status }}</span></td>
+                  <td>{{ doc.remarks || '—' }}</td>
+                  <td>
+                    @if (doc.status === 'PENDING') {
+                      <button class="btn btn-sm btn-success" (click)="verifyDoc(doc.id, 'VERIFIED', '')">Verify</button>
+                      <button class="btn btn-sm btn-danger" style="margin-left:4px" (click)="verifyDoc(doc.id, 'REJECTED', 'Document rejected')">Reject</button>
+                    }
+                    <button class="btn btn-sm btn-secondary" style="margin-left:4px" (click)="viewDoc(doc.id)">View</button>                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- Decision -->
+    <!-- No documents yet — admin can request them -->
+    @if (!existingDecision && documents.length === 0 && application.status === 'SUBMITTED') {
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:12px">Application Review</h3>
+        <p style="color:#7f8c8d; font-size:13px; margin-bottom:16px">
+          Review the applicant details above. If everything looks good, request documents from the applicant to proceed.
+        </p>
+        <button class="btn btn-primary" (click)="requestDocuments()" [disabled]="loading">
+          {{ loading ? 'Processing...' : 'Request Documents from Applicant' }}
+        </button>
+      </div>
+    }
+
+    @if (!existingDecision && application.status === 'DOCS_PENDING') {
+      <div class="alert alert-info">
+        Documents have been requested. Waiting for the applicant to upload documents.
+      </div>
+    }
+
+    @if (!existingDecision && documents.length > 0 && !allDocsVerified()) {
+      <div class="alert alert-info">
+        Please verify all documents before making a decision.
+      </div>
+    }
+
+    @if (!existingDecision && documents.length > 0 && allDocsVerified()) {
+      <div class="card">
+        <h3 style="margin-bottom:16px; font-size:15px">Make Decision</h3>
+        <form (ngSubmit)="makeDecision()" #df="ngForm">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Decision</label>
+              <select name="decisionType" [(ngModel)]="decisionForm.decisionType" required>
+                <option value="">Select...</option>
+                <option value="APPROVED">Approve</option>
+                <option value="REJECTED">Reject</option>
+              </select>
+            </div>
+            @if (decisionForm.decisionType === 'APPROVED') {
+              <div class="form-group">
+                <label>Approved Amount (₹)</label>
+                <input type="number" name="approvedAmount" [(ngModel)]="decisionForm.approvedAmount" />
+              </div>
+              <div class="form-group">
+                <label>Interest Rate (%)</label>
+                <input type="number" name="interestRate" [(ngModel)]="decisionForm.interestRate" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>Tenure (Months)</label>
+                <input type="number" name="tenureMonths" [(ngModel)]="decisionForm.tenureMonths" />
+              </div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Remarks</label>
+            <textarea name="remarks" [(ngModel)]="decisionForm.remarks" rows="2" placeholder="Add remarks..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" [disabled]="deciding">
+            {{ deciding ? 'Submitting...' : 'Submit Decision' }}
+          </button>
+        </form>
+      </div>
+    }
+
+    <!-- Existing Decision -->
+    @if (existingDecision) {
+      <div class="card">
+        <h3 style="margin-bottom:16px; font-size:15px">Decision</h3>
+        <div class="grid-2">
+          <div><strong>Decision:</strong> <span [class]="'badge ' + ((existingDecision.decisionType || existingDecision.decision) === 'APPROVED' ? 'badge-approved' : 'badge-rejected')">{{ existingDecision.decisionType || existingDecision.decision }}</span></div>          <div><strong>By:</strong> {{ existingDecision.adminEmail }}</div>
+          @if (existingDecision.approvedAmount) {
+            <div><strong>Approved Amount:</strong> ₹{{ existingDecision.approvedAmount | number }}</div>
+            <div><strong>Interest Rate:</strong> {{ existingDecision.interestRate }}%</div>
+          }
+          <div><strong>Remarks:</strong> {{ existingDecision.remarks }}</div>
+        </div>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,35 @@
+<div class="navbar">
+  <a [routerLink]="auth.isAdmin() ? '/admin/dashboard' : '/user/dashboard'" class="brand">FinFlow</a>
+
+  <nav>
+    @if (!auth.isAdmin()) {
+      <a routerLink="/user/dashboard" routerLinkActive="active">Dashboard</a>
+      <a routerLink="/user/apply" routerLinkActive="active">Apply</a>
+      <a routerLink="/user/documents" routerLinkActive="active">Documents</a>
+    }
+    @if (auth.isAdmin()) {
+      <a routerLink="/admin/dashboard" routerLinkActive="active">Dashboard</a>
+      <a routerLink="/admin/applications" routerLinkActive="active" style="position:relative">
+        Applications
+        @if (pendingCount > 0) {
+          <span class="badge-count">{{ pendingCount }}</span>
+        }
+      </a>
+      <a routerLink="/admin/users" routerLinkActive="active">Users</a>
+    }
+  </nav>
+
+  <div class="flex" style="align-items:center; gap:12px">
+    <!-- Theme toggle -->
+    <div class="nav-theme-toggle" (click)="toggleTheme()" [title]="isDark ? 'Switch to Light' : 'Switch to Dark'">
+      {{ isDark ? '☀️' : '🌙' }}
+    </div>
+    @if (!auth.isAdmin()) {
+      <a routerLink="/user/profile" style="color:#bdc3c7; font-size:12px; text-decoration:underline; cursor:pointer">Profile</a>
+    }
+    @if (auth.isAdmin()) {
+      <span class="user-info">{{ auth.getEmail() }}</span>
+    }
+    <button class="btn-logout" (click)="logout()">Logout</button>
+  </div>
+</div>

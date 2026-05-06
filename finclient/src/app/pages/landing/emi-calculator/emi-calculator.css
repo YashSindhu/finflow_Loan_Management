@@ -1,0 +1,105 @@
+.emi-section {
+  background: #f4f6f9;
+  padding: 48px 16px;
+}
+
+.emi-box {
+  max-width: 900px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.emi-inputs { display: flex; flex-direction: column; gap: 24px; }
+
+.emi-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.emi-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #fff;
+}
+
+.emi-input-wrap input {
+  border: none;
+  outline: none;
+  padding: 10px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  flex: 1;
+  width: 100%;
+}
+
+.emi-prefix, .emi-suffix {
+  font-size: 14px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.emi-range {
+  width: 100%;
+  margin-top: 8px;
+  accent-color: #4a90e2;
+  cursor: pointer;
+}
+
+.emi-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #95a5a6;
+  margin-top: 4px;
+}
+
+.emi-result { display: flex; flex-direction: column; gap: 20px; }
+
+.emi-monthly {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.emi-label { font-size: 12px; opacity: 0.9; margin-bottom: 8px; }
+.emi-value { font-size: 36px; font-weight: 700; }
+
+.emi-breakdown { display: flex; flex-direction: column; gap: 12px; }
+
+.emi-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-principal { background: #3498db; }
+.dot-interest  { background: #e74c3c; }
+.dot-total     { background: #27ae60; }
+
+.breakdown-label { font-size: 11px; color: #7f8c8d; }
+.breakdown-value { font-size: 15px; font-weight: 600; color: #2c3e50; }
+
+@media (max-width: 768px) {
+  .emi-box { grid-template-columns: 1fr; }
+}

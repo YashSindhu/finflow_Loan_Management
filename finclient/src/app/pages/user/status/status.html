@@ -1,0 +1,74 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header flex-between">
+    <div>
+      <h1>Application Status</h1>
+      <p>Track your loan application journey</p>
+    </div>
+    <a routerLink="/user/dashboard" class="btn btn-secondary">← Back</a>
+  </div>
+
+  @if (loading) { <div class="loading">Loading...</div> }
+  @if (error)   { <div class="alert alert-error">{{ error }}</div> }
+
+  @if (!loading && application) {
+    <!-- Application Summary -->
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h3 style="font-size:15px">Application #{{ application.id }}</h3>
+          <p style="color:#7f8c8d; font-size:13px; margin-top:4px">{{ application.loanPurpose }} Loan</p>
+        </div>
+        <span [class]="'badge ' + getBadgeClass(application.status)">{{ application.status }}</span>
+      </div>
+      <div class="grid-3 mt-16">
+        <div><label style="font-size:11px; color:#7f8c8d">LOAN AMOUNT</label><p style="font-weight:600">₹{{ application.loanAmount | number }}</p></div>
+        <div><label style="font-size:11px; color:#7f8c8d">TENURE</label><p style="font-weight:600">{{ application.tenureMonths }} months</p></div>
+        <div><label style="font-size:11px; color:#7f8c8d">APPLIED ON</label><p style="font-weight:600">{{ application.createdAt | date:'dd MMM yyyy' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+      <h3 style="font-size:15px; margin-bottom:24px">Application Timeline</h3>
+      <div class="timeline">
+        @for (item of timeline; track item.key) {
+          <div class="timeline-item">
+            <div [class]="'timeline-dot ' + item.state">
+              @if (item.state === 'done')    { ✓ }
+              @if (item.state === 'active')  { ● }
+              @if (item.state === 'pending') { ○ }
+            </div>
+            <div class="timeline-content">
+              <h4 [style.color]="item.state === 'pending' ? '#bdc3c7' : ''">{{ item.label }}</h4>
+              <p>{{ item.desc }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Actions based on status -->
+    @if (application.status === 'DOCS_PENDING' || application.status === 'SUBMITTED') {
+      <div class="alert alert-info">
+        @if (application.status === 'DOCS_PENDING') {
+          Admin has reviewed your application and is requesting documents. Please upload your KYC and income documents.
+        } @else {
+          Your application is submitted and under initial review.
+        }
+        <a [routerLink]="['/user/documents']" [queryParams]="{appId: application.id}" class="btn btn-sm btn-primary" style="margin-left:12px">Upload Documents</a>
+      </div>
+    }
+    @if (application.status === 'APPROVED') {
+      <div class="alert alert-success">
+        Your loan has been approved! Our team will contact you shortly with disbursement details.
+      </div>
+    }
+    @if (application.status === 'REJECTED') {
+      <div class="alert alert-error">
+        Your application was not approved this time. You may apply again after 30 days.
+      </div>
+    }
+  }
+</div>

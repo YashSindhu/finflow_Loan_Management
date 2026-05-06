@@ -131,14 +131,13 @@ class AdminServiceTest {
 
     @Test
     void getReports_returnsCorrectCounts() {
-        List<Map<String, Object>> apps = List.of(Map.of("id", 1), Map.of("id", 2), Map.of("id", 3));
+        List<Map<String, Object>> apps = List.of(
+                Map.of("id", 1, "status", "APPROVED", "loanAmount", 500000.0),
+                Map.of("id", 2, "status", "REJECTED"),
+                Map.of("id", 3)
+        );
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(ResponseEntity.ok(apps));
-
-        Decision approved = new Decision(); approved.setDecision(DecisionType.APPROVED);
-        Decision rejected = new Decision(); rejected.setDecision(DecisionType.REJECTED);
-        when(decisionRepository.findByDecisionType(DecisionType.APPROVED)).thenReturn(List.of(approved));
-        when(decisionRepository.findByDecisionType(DecisionType.REJECTED)).thenReturn(List.of(rejected));
 
         Map<String, Object> report = adminService.getReports();
 
@@ -146,6 +145,7 @@ class AdminServiceTest {
         assertEquals(1L, report.get("approved"));
         assertEquals(1L, report.get("rejected"));
         assertEquals(1L, report.get("pending"));
+        assertEquals(500000.0, report.get("totalLoanAmount"));
     }
 
     // --- getAllUsers ---

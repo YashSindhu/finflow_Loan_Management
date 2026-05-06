@@ -1,24 +1,32 @@
 package com.example.adminservice.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.adminservice.dto.DecisionRequest;
 import com.example.adminservice.dto.UserUpdateRequest;
 import com.example.adminservice.entity.Decision;
 import com.example.adminservice.service.AdminService;
-import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
-    private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final AdminService adminService;
 
@@ -26,14 +34,15 @@ public class AdminController {
         this.adminService = adminService;
     }
 
+    // Both ROLE_ADMIN and ROLE_SUPER_ADMIN have admin access
+    private boolean isAdmin(String role) {
+        return "ROLE_ADMIN".equals(role) || "ROLE_SUPER_ADMIN".equals(role);
+    }
+
     @GetMapping("/applications")
     public ResponseEntity<List<Map<String, Object>>> getAllApplications(
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("GET /admin/applications - access denied for role: {}", role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("GET /admin/applications - by admin");
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.getAllApplications());
     }
 
@@ -41,11 +50,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> getApplication(
             @PathVariable Long id,
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("GET /admin/applications/{} - access denied for role: {}", id, role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("GET /admin/applications/{} - by admin", id);
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.getApplicationById(id));
     }
 
@@ -55,11 +60,8 @@ public class AdminController {
             @RequestHeader(value = "X-User-Email", required = false) String adminEmail,
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @Valid @RequestBody DecisionRequest request) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("POST /admin/applications/{}/decision - access denied for role: {}", id, role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("POST /admin/applications/{}/decision - by admin: {}", id, adminEmail);
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
+        log.info("POST /admin/applications/{}/decision - by: {}", id, adminEmail);
         return ResponseEntity.ok(adminService.makeDecision(id, adminEmail, request));
     }
 
@@ -67,33 +69,21 @@ public class AdminController {
     public ResponseEntity<Decision> getDecision(
             @PathVariable Long id,
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("GET /admin/applications/{}/decision - access denied for role: {}", id, role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("GET /admin/applications/{}/decision - by admin", id);
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.getDecisionByApplication(id));
     }
 
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> getReports(
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("GET /admin/reports - access denied for role: {}", role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("GET /admin/reports - by admin");
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.getReports());
     }
 
     @GetMapping("/users")
     public ResponseEntity<List<Map<String, Object>>> getAllUsers(
             @RequestHeader(value = "X-User-Role", required = false) String role) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("GET /admin/users - access denied for role: {}", role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("GET /admin/users - by admin");
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.getAllUsers());
     }
 
@@ -102,11 +92,7 @@ public class AdminController {
             @PathVariable Long id,
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestBody UserUpdateRequest request) {
-        if (!ROLE_ADMIN.equals(role)) {
-            log.warn("PUT /admin/users/{} - access denied for role: {}", id, role);
-            return ResponseEntity.status(403).build();
-        }
-        log.info("PUT /admin/users/{} - by admin", id);
+        if (!isAdmin(role)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(adminService.updateUser(id, request));
     }
 }

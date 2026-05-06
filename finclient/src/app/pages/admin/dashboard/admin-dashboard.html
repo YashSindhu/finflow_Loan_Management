@@ -1,0 +1,77 @@
+<app-navbar />
+
+<div class="page container">
+  <div class="page-header">
+    <h1>Admin Dashboard</h1>
+    <p>Overview of all loan applications</p>
+  </div>
+
+  @if (loading) { <div class="loading">Loading reports...</div> }
+
+  @if (!loading && reports) {
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-value">{{ reports.totalApplications || reports.total || 0 }}</div>
+        <div class="stat-label">Total Applications</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#27ae60">{{ reports.approved || 0 }}</div>
+        <div class="stat-label">Approved</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#e74c3c">{{ reports.rejected || 0 }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#f39c12">{{ reports.pending || 0 }}</div>
+        <div class="stat-label">Pending Review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#2980b9">{{ reports.submitted || 0 }}</div>
+        <div class="stat-label">Awaiting Action</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">₹{{ (reports.totalLoanAmount || 0) | number }}</div>
+        <div class="stat-label">Total Loan Value</div>
+      </div>
+    </div>
+  }
+
+  <!-- Recent Applications -->
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:16px">
+      <h3 style="font-size:15px">All Applications</h3>
+      <a routerLink="/admin/applications" class="btn btn-sm btn-primary">View All</a>
+    </div>
+    @if (!loading && applications.length > 0) {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Applicant</th>
+              <th>Amount</th>
+              <th>Purpose</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (app of applications.slice(0, 10); track app.id) {
+              <tr>
+                <td>{{ app.id }}</td>
+                <td>{{ app.email || app.fullName }}</td>
+                <td>₹{{ app.loanAmount | number }}</td>
+                <td>{{ app.loanPurpose }}</td>
+                <td><span [class]="'badge ' + getBadgeClass(app.status)">{{ app.status }}</span></td>
+                <td>
+                  <a [routerLink]="['/admin/applications', app.id]" class="btn btn-sm btn-primary">Review</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
