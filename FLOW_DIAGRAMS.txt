@@ -1,0 +1,682 @@
+================================================================================
+              FINFLOW - COMPLETE REQUEST FLOW DIAGRAMS
+================================================================================
+
+================================================================================
+FLOW 1: USER REGISTRATION
+================================================================================
+
+User fills Register form in browser (http://localhost:4200)
+              │
+              ▼
+┌─────────────────────────────┐
+│      register.ts            │  ← user fills name, email, password
+│   (click) → onRegister()   │
+│   calls AuthService         │
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│      auth.service.ts        │  ← Angular service
+│   register(request)         │
+│   this.http.post(           │
+│   '/gateway/auth/register') │
+└──────────────┬──────────────┘
+               │ HTTP POST http://localhost:8080/gateway/auth/register
+               ▼
+┌─────────────────────────────┐
+│     API Gateway :8080       │
+│   JwtAuthFilter.java        │  ← NO JWT check (public route)
+│   GatewayRoutes             │  ← routes /gateway/auth/register
+│                             │     → lb://auth-service
+└──────────────┬──────────────┘
+               │ via Eureka load balancer
+               ▼
+┌─────────────────────────────┐
+│     Eureka Server :8761     │  ← resolves auth-service → localhost:8081
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│     auth-service :8081      │
+│     AuthController.java     │  ← @PostMapping("/auth/register")
+│     @Valid RegisterRequest  │  ← validates name, email, password
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│      AuthService.java       │
+│   findByEmail() check       │──── JPA ───► finflow_auth DB
+│   BCrypt.encode(password)   │  ← never store plain password
+│   user.setRole(ROLE_USER)   │
+│   userRepository.save()     │──── JPA ───► finflow_auth DB
+└──────────────┬──────────────┘
+               │
+               ▼
+         "User registered successfully"
+               │
+               ▼
+┌─────────────────────────────┐
+│      register.ts            │  ← shows success message
+│   router.navigate('/login') │  ← redirects to login page
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 2: USER LOGIN + JWT TOKEN
+================================================================================
+
+User fills Login form in browser
+              │
+              ▼
+┌─────────────────────────────┐
+│       login.ts              │  ← user enters email, password
+│   (click) → onLogin()       │
+│   calls AuthService         │
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│      auth.service.ts        │
+│   login(request)            │
+│   this.http.post(           │
+│   '/gateway/auth/login',    │
+│   { observe: 'response' })  │  ← need full response to read headers
+└──────────────┬──────────────┘
+               │ HTTP POST http://localhost:8080/gateway/auth/login
+               ▼
+┌─────────────────────────────┐
+│     API Gateway :8080       │  ← public route, no JWT check
+│   routes → auth-service     │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│     auth-service :8081      │
+│     AuthController.java     │  ← @PostMapping("/auth/login")
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│      AuthService.java       │
+│   authManager.authenticate()│  ← Spring Security verifies password
+│   userRepo.findByEmail()    │──── JPA ───► finflow_auth DB
+│   jwtUtil.generateToken(    │
+│     email, role)            │  ← creates JWT with email + role
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   Response Headers:         │
+│   Authorization: Bearer     │
+│   eyJhbGciOiJIUzI1NiJ9...  │  ← JWT token
+│   Body: { role, email }     │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│      auth.service.ts        │
+│   localStorage.setItem(     │
+│     'token', jwt)           │  ← saves token in browser
+│   localStorage.setItem(     │
+│     'role', role)           │
+│   localStorage.setItem(     │
+│     'email', email)         │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│       login.ts              │
+│   if ROLE_ADMIN →           │
+│     navigate('/admin/dash') │
+│   if ROLE_USER →            │
+│     navigate('/dashboard')  │
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 3: EVERY PROTECTED API REQUEST (JWT INTERCEPTOR)
+================================================================================
+
+Any Angular component makes HTTP call
+              │
+              ▼
+┌─────────────────────────────┐
+│      jwt.interceptor.ts     │  ← runs on EVERY HTTP request
+│   reads localStorage        │
+│   token = getToken()        │
+│   adds header:              │
+│   Authorization: Bearer JWT │
+└──────────────┬──────────────┘
+               │ HTTP request with JWT header
+               ▼
+┌─────────────────────────────┐
+│     API Gateway :8080       │
+│     JwtAuthFilter.java      │
+│   reads Authorization header│
+│   validates JWT signature   │  ← checks secret key
+│   checks token not expired  │
+│   extracts email + role     │
+│   adds headers:             │
+│   X-User-Email: user@...    │
+│   X-User-Role: ROLE_USER    │
+│   routes to correct service │
+└──────────────┬──────────────┘
+               │ request forwarded with X-User-Email, X-User-Role headers
+               ▼
+         Microservice receives request
+         reads X-User-Email for identity
+         reads X-User-Role for authorization
+
+
+================================================================================
+FLOW 4: CREATE LOAN APPLICATION
+================================================================================
+
+User fills Apply Loan form (multi-step)
+              │
+              ▼
+┌─────────────────────────────┐
+│      apply.ts               │  ← personal info + loan details
+│   (click) → onSubmit()      │
+│   calls LoanService         │
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│      loan.service.ts        │
+│   createApplication(req)    │
+│   this.http.post(           │
+│   '/gateway/applications')  │
+└──────────────┬──────────────┘
+               │ jwt.interceptor adds Bearer token
+               │ HTTP POST http://localhost:8080/gateway/applications
+               ▼
+┌─────────────────────────────┐
+│     API Gateway :8080       │
+│   JwtAuthFilter validates   │
+│   extracts email from JWT   │
+│   adds X-User-Email header  │
+│   routes → application-svc  │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│  application-service :8082  │
+│  LoanApplicationController  │  ← @PostMapping("/applications")
+│  reads X-User-Email header  │  ← gets user identity from gateway
+└──────────────┬──────────────┘
+               │ calls
+               ▼
+┌─────────────────────────────┐
+│  LoanApplicationService     │
+│   app.setApplicantEmail()   │
+│   app.setStatus(DRAFT)      │
+│   repository.save(app)      │──── JPA ───► finflow_application DB
+└──────────────┬──────────────┘
+               │
+               ▼
+         Returns { id: 1, status: "DRAFT", ... }
+               │
+               ▼
+┌─────────────────────────────┐
+│      apply.ts               │
+│   applicationId = app.id    │
+│   shows "Application saved" │
+│   user clicks Submit button │
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 5: SUBMIT APPLICATION + RABBITMQ OUTBOX PATTERN
+================================================================================
+
+User clicks "Submit Application" button
+              │
+              ▼
+┌─────────────────────────────┐
+│      apply.ts               │
+│   submitApplication(id)     │
+│   calls LoanService         │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│      loan.service.ts        │
+│   submitApplication(id)     │
+│   HTTP POST                 │
+│   '/gateway/applications    │
+│    /1/submit'               │
+└──────────────┬──────────────┘
+               │ via API Gateway → application-service
+               ▼
+┌─────────────────────────────┐
+│  LoanApplicationService     │
+│   checks status == DRAFT    │
+│   app.setStatus(SUBMITTED)  │
+│                             │
+│   ┌─── SAME TRANSACTION ───┐│
+│   │ repository.save(app)   ││──── JPA ───► finflow_application DB
+│   │ outboxRepo.save(event) ││──── JPA ───► outbox_events table
+│   └────────────────────────┘│
+│   (both saved or both fail) │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   outbox_events table       │
+│   eventType: APP_SUBMITTED  │
+│   payload: {id:1,           │
+│     email: user@test.com}   │
+│   published: false          │
+└──────────────┬──────────────┘
+               │ every 5 seconds
+               ▼
+┌─────────────────────────────┐
+│   OutboxEventPublisher.java │  ← @Scheduled(fixedDelay=5000)
+│   findByPublishedFalse()    │
+│   rabbitTemplate.send(      │
+│     finflow.exchange,       │
+│     application.submitted,  │
+│     payload)                │
+│   event.setPublished(true)  │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│        RabbitMQ             │
+│   Exchange: finflow.exchange│
+│   Routing: app.submitted    │
+│                             │
+│   application.submitted     │
+│   .queue (main)             │
+│                             │
+│   application.submitted     │
+│   .dlq (if fails)           │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   admin-service :8084       │
+│   ApplicationEventConsumer  │  ← @RabbitListener
+│   handleApplicationSubmitted│
+│   logs: "New application    │
+│   ready for admin review"   │
+└─────────────────────────────┘
+               │
+               │ if consumer fails
+               ▼
+┌─────────────────────────────┐
+│   DeadLetterQueueConsumer   │  ← @RabbitListener on DLQ
+│   logs failed message       │
+│   for manual inspection     │
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 6: UPLOAD DOCUMENT
+================================================================================
+
+User selects file and clicks Upload
+              │
+              ▼
+┌─────────────────────────────┐
+│      documents.ts           │
+│   onUpload()                │
+│   FormData with file        │
+│   calls DocumentService     │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│      document.service.ts    │
+│   uploadDocument(           │
+│     appId, type, file)      │
+│   HTTP POST multipart       │
+│   '/gateway/documents       │
+│    /upload'                 │
+└──────────────┬──────────────┘
+               │ via API Gateway → document-service
+               ▼
+┌─────────────────────────────┐
+│   document-service :8083    │
+│   DocumentController        │  ← @PostMapping("/documents/upload")
+│   DocumentService.upload()  │
+│   UUID + filename           │  ← prevents path traversal attack
+│   Files.copy(stream, path)  │──── saves to /uploads/documents/
+│   repository.save(doc)      │──── JPA ───► finflow_document DB
+└──────────────┬──────────────┘
+               │
+               ▼
+         Returns { id:1, status:"PENDING", ... }
+
+
+================================================================================
+FLOW 7: ADMIN VERIFIES DOCUMENT + MAKES DECISION
+================================================================================
+
+Admin opens Applications page
+              │
+              ▼
+┌─────────────────────────────┐
+│   admin-applications.ts     │
+│   loadApplications()        │
+│   HTTP GET                  │
+│   '/gateway/admin           │
+│    /applications'           │
+│   header: X-User-Role:      │
+│   ROLE_ADMIN                │
+└──────────────┬──────────────┘
+               │ via API Gateway (JWT validated, role checked)
+               ▼
+┌─────────────────────────────┐
+│   admin-service :8084       │
+│   AdminController           │  ← checks X-User-Role == ROLE_ADMIN
+│   AdminService              │
+│   restTemplate.exchange(    │  ← calls application-service
+│   applicationServiceUrl +   │     (synchronous HTTP call)
+│   "/applications/admin/all")│
+└──────────────┬──────────────┘
+               │ HTTP GET to application-service
+               ▼
+┌─────────────────────────────┐
+│  application-service :8082  │  ← returns all applications
+└──────────────┬──────────────┘
+               │
+               ▼
+         Admin sees all applications in table
+               │
+               │ Admin clicks Verify Document
+               ▼
+┌─────────────────────────────┐
+│   admin-applications.ts     │
+│   verifyDocument(id,        │
+│     'VERIFIED', remarks)    │
+│   HTTP PUT                  │
+│   '/gateway/documents       │
+│    /admin/1/verify'         │
+└──────────────┬──────────────┘
+               │ via API Gateway → document-service
+               ▼
+┌─────────────────────────────┐
+│   document-service :8083    │
+│   doc.setStatus(VERIFIED)   │
+│   doc.setVerifiedAt(now)    │
+│   repository.save(doc)      │──── JPA ───► finflow_document DB
+└──────────────┬──────────────┘
+               │
+               │ Admin clicks Make Decision
+               ▼
+┌─────────────────────────────┐
+│   admin-applications.ts     │
+│   makeDecision(appId, req)  │
+│   HTTP POST                 │
+│   '/gateway/admin           │
+│    /applications/1/decision'│
+└──────────────┬──────────────┘
+               │ via API Gateway → admin-service
+               ▼
+┌─────────────────────────────┐
+│   admin-service :8084       │
+│   AdminService.java         │
+│   decisionRepo.save()       │──── JPA ───► finflow_admin DB
+│   updateApplicationStatus() │──── HTTP ──► application-service
+│   (APPROVED or REJECTED)    │     (synchronous RestTemplate call)
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│  application-service :8082  │
+│   app.setStatus(APPROVED)   │
+│   repository.save(app)      │──── JPA ───► finflow_application DB
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 8: VIEW REPORTS
+================================================================================
+
+Admin opens Reports page
+              │
+              ▼
+┌─────────────────────────────┐
+│   admin-reports.ts          │
+│   ngOnInit()                │
+│   calls AdminService        │
+│   getReports()              │
+│   HTTP GET                  │
+│   '/gateway/admin/reports'  │
+└──────────────┬──────────────┘
+               │ via API Gateway → admin-service
+               ▼
+┌─────────────────────────────┐
+│   admin-service :8084       │
+│   AdminService.getReports() │
+│   getAllApplications()      │──── HTTP ──► application-service
+│   decisionRepo              │
+│   .findByDecisionType       │
+│   (APPROVED)                │──── JPA ───► finflow_admin DB
+│   .findByDecisionType       │
+│   (REJECTED)                │──── JPA ───► finflow_admin DB
+│   calculates:               │
+│   total, approved,          │
+│   rejected, pending,        │
+│   approvalRate %            │
+└──────────────┬──────────────┘
+               │
+               ▼
+         Returns {
+           totalApplications: 5,
+           approved: 3,
+           rejected: 1,
+           pending: 1,
+           approvalRate: "60.0%"
+         }
+               │
+               ▼
+┌─────────────────────────────┐
+│   admin-reports.ts          │
+│   shows stats cards         │
+│   shows progress bars       │
+│   shows users table         │
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 9: CONFIG SERVER - HOW SERVICES GET THEIR CONFIG
+================================================================================
+
+Any microservice starts up
+              │
+              ▼
+┌─────────────────────────────┐
+│   application.properties    │
+│   spring.config.import=     │
+│   configserver:             │
+│   http://config-server:8888 │
+└──────────────┬──────────────┘
+               │ HTTP GET http://config-server:8888/auth-service/default
+               ▼
+┌─────────────────────────────┐
+│   config-server :8888       │
+│   reads from classpath:     │
+│   /configs/                 │
+│   auth-service.properties   │
+│   returns all properties    │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   Service gets:             │
+│   spring.datasource.url     │
+│   spring.rabbitmq.host      │
+│   eureka.client.serviceUrl  │
+│   jwt.secret                │
+│   management.zipkin...      │
+└─────────────────────────────┘
+               │
+               ▼
+         Service starts with all config
+         connects to PostgreSQL
+         connects to RabbitMQ
+         registers with Eureka
+
+
+================================================================================
+FLOW 10: EUREKA - HOW SERVICES FIND EACH OTHER
+================================================================================
+
+Service starts up
+              │
+              ▼
+┌─────────────────────────────┐
+│   EurekaClient              │
+│   registers itself:         │
+│   "I am auth-service        │
+│    running at 172.18.0.5    │
+│    :8081"                   │
+└──────────────┬──────────────┘
+               │ POST to Eureka
+               ▼
+┌─────────────────────────────┐
+│   Eureka Server :8761       │
+│   stores registry:          │
+│   AUTH-SERVICE → 172.18.0.5 │
+│   ADMIN-SERVICE → 172.18.0.6│
+│   APPLICATION-SERVICE → ... │
+└──────────────┬──────────────┘
+               │
+               │ API Gateway needs to route to auth-service
+               ▼
+┌─────────────────────────────┐
+│   API Gateway               │
+│   lb://auth-service         │  ← lb = load balancer
+│   asks Eureka:              │
+│   "where is auth-service?"  │
+│   Eureka returns IP:PORT    │
+│   Gateway forwards request  │
+└─────────────────────────────┘
+
+
+================================================================================
+FLOW 11: ZIPKIN - DISTRIBUTED TRACING
+================================================================================
+
+User makes any API call
+              │
+              ▼
+┌─────────────────────────────┐
+│   API Gateway               │
+│   creates Trace ID:         │
+│   abc123                    │
+│   Span ID: 001              │
+│   sends to Zipkin           │
+└──────────────┬──────────────┘
+               │ forwards request with trace headers
+               ▼
+┌─────────────────────────────┐
+│   auth-service              │
+│   same Trace ID: abc123     │
+│   new Span ID: 002          │
+│   records time taken        │
+│   sends to Zipkin           │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   Zipkin :9411              │
+│   stores all spans          │
+│   shows full trace:         │
+│   gateway (5ms)             │
+│     └── auth-service (45ms) │
+│           └── DB query(20ms)│
+└─────────────────────────────┘
+               │
+               ▼
+         Open http://localhost:9411
+         Search by Trace ID
+         See full request journey
+
+
+================================================================================
+FLOW 12: CI/CD - GITHUB ACTIONS
+================================================================================
+
+Developer pushes code
+              │
+              ▼
+┌─────────────────────────────┐
+│   git push origin master    │
+└──────────────┬──────────────┘
+               │ triggers
+               ▼
+┌─────────────────────────────┐
+│   GitHub Actions            │
+│   .github/workflows/        │
+│   ci-cd.yml                 │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   Build & Test              │  ← runs in parallel for all 7 services
+│   (7 jobs simultaneously)   │
+│   - checkout code           │
+│   - setup Java 17           │
+│   - mvn clean package       │
+│   - upload jar artifact     │
+└──────────────┬──────────────┘
+               │ if all pass
+               ▼
+┌─────────────────────────────┐
+│   Docker Build & Push       │  ← runs in parallel for all 7 services
+│   (7 jobs simultaneously)   │
+│   - download jar artifact   │
+│   - docker login            │
+│   - docker build            │
+│   - docker push to Hub      │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   Docker Hub                │
+│   yashsindhu/               │
+│   finflow-auth-service:     │
+│   latest                    │
+│   finflow-admin-service:    │
+│   latest                    │
+│   ... (7 images total)      │
+└─────────────────────────────┘
+
+
+================================================================================
+COMPLETE DATA FLOW SUMMARY
+================================================================================
+
+DATABASES (separate per service):
+  finflow_auth        → users table
+  finflow_application → loan_applications + outbox_events tables
+  finflow_document    → documents table
+  finflow_admin       → decisions table
+
+SYNCHRONOUS CALLS (HTTP - caller waits):
+  admin-service → application-service (get applications)
+  admin-service → auth-service (get users)
+  admin-service → application-service (update status after decision)
+
+ASYNCHRONOUS CALLS (RabbitMQ - caller does NOT wait):
+  application-service → RabbitMQ → admin-service
+  (when application is submitted)
+
+SECURITY FLOW:
+  Angular → JWT in header → API Gateway validates → injects X-User-Email/Role
+  → Microservice trusts headers from gateway
+
+CONFIG FLOW:
+  Service starts → fetches config from Config Server → connects to DB/RabbitMQ
+
+DISCOVERY FLOW:
+  Service starts → registers with Eureka → Gateway uses lb:// to find services
+
+================================================================================
+                         END OF FLOW DOCUMENT
+================================================================================
